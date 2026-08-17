@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="description" content="Agilmea IK — suivi des frais kilométriques multi-entreprises avec calcul automatique de distance routière." />
+  <title>Agilmea IK</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header screen-only">
+    <div>
+      <h1>Agilmea IK</h1>
+      <p>Trajets, kilomètres automatiques et rapports séparés</p>
+    </div>
+    <button id="installBtn" class="ghost hidden">Installer</button>
+  </header>
+
+  <main>
+    <section id="setupBanner" class="card warning screen-only hidden">
+      <strong>Configuration nécessaire</strong>
+      <p>Ajoute d’abord ton ou tes véhicules et tes structures dans <b>Réglages</b>.</p>
+      <button data-tab="settings">Ouvrir les réglages</button>
+    </section>
+
+    <section id="tab-trip" class="tab-panel active screen-only">
+      <div class="card">
+        <h2>Nouveau trajet</h2>
+        <div class="grid two">
+          <label>Date
+            <input id="tripDate" type="date" />
+          </label>
+          <label>Structure
+            <select id="tripCompany"></select>
+          </label>
+        </div>
+        <label>Véhicule
+          <select id="tripVehicle"></select>
+        </label>
+        <label>Départ
+          <input id="tripFrom" type="text" placeholder="Ex. 12 rue ..., Grenoble" autocomplete="street-address" />
+        </label>
+        <label>Destination
+          <input id="tripTo" type="text" placeholder="Ex. Lyon Part-Dieu" autocomplete="street-address" />
+        </label>
+
+        <div class="route-actions">
+          <button id="calcDistanceBtn" class="primary">Calculer les kilomètres</button>
+          <label class="inline-check"><input id="roundTrip" type="checkbox" /> Aller-retour</label>
+        </div>
+        <div id="routeStatus" class="status"></div>
+
+        <div class="grid two">
+          <label>Distance (km)
+            <input id="tripKm" type="number" min="0" step="0.1" placeholder="Calcul automatique" />
+          </label>
+          <label>Motif
+            <input id="tripPurpose" type="text" placeholder="Ex. rendez-vous client" />
+          </label>
+        </div>
+        <p class="hint">Tu peux toujours corriger manuellement la distance calculée si tu as emprunté un autre itinéraire. Géocodage : © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>.</p>
+        <button id="saveTripBtn" class="primary wide">Enregistrer le trajet</button>
+      </div>
+
+      <div class="card compact">
+        <h3>Dernier trajet</h3>
+        <div id="lastTrip">Aucun trajet enregistré.</div>
+      </div>
+    </section>
+
+    <section id="tab-history" class="tab-panel screen-only">
+      <div class="card">
+        <div class="section-head">
+          <h2>Historique</h2>
+          <button id="clearTripsBtn" class="danger ghost">Tout effacer</button>
+        </div>
+        <div class="grid two">
+          <label>Filtrer par structure
+            <select id="historyCompany"><option value="">Toutes</option></select>
+          </label>
+          <label>Année
+            <select id="historyYear"></select>
+          </label>
+        </div>
+        <div id="historyList" class="trip-list"></div>
+      </div>
+    </section>
+
+    <section id="tab-reports" class="tab-panel screen-only">
+      <div class="card">
+        <h2>Rapports</h2>
+        <div class="grid two">
+          <label>Structure
+            <select id="reportCompany"></select>
+          </label>
+          <label>Véhicule
+            <select id="reportVehicle"><option value="">Tous les véhicules</option></select>
+          </label>
+          <label>Du
+            <input id="reportFrom" type="date" />
+          </label>
+          <label>Au
+            <input id="reportTo" type="date" />
+          </label>
+        </div>
+        <button id="generateReportBtn" class="primary wide">Générer le rapport</button>
+      </div>
+
+      <div id="reportCard" class="card hidden">
+        <div class="section-head">
+          <h2 id="reportTitle">Rapport</h2>
+          <div class="button-row">
+            <button id="csvBtn">CSV</button>
+            <button id="printBtn">Imprimer / PDF</button>
+          </div>
+        </div>
+        <div id="reportSummary" class="summary-grid"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Trajet</th><th>Motif</th><th>Km</th><th>Montant</th></tr></thead>
+            <tbody id="reportRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="tab-panel screen-only">
+      <div class="card">
+        <h2>Structures</h2>
+        <div id="companiesList"></div>
+        <button id="addCompanyBtn">+ Ajouter une structure</button>
+      </div>
+
+      <div class="card">
+        <h2>Véhicules</h2>
+        <div id="vehiclesList"></div>
+        <button id="addVehicleBtn">+ Ajouter un véhicule</button>
+      </div>
+
+      <div class="card">
+        <h2>Sauvegarde</h2>
+        <p class="hint">Les données restent dans le navigateur de ton téléphone. Fais régulièrement une sauvegarde JSON.</p>
+        <div class="button-row">
+          <button id="exportBackupBtn">Exporter la sauvegarde</button>
+          <label class="file-button">Importer<input id="importBackupInput" type="file" accept="application/json" /></label>
+        </div>
+      </div>
+
+      <div class="card small-text">
+        <h2>Barèmes intégrés</h2>
+        <p><b>IK France 2026 :</b> barème officiel Urssaf pour voitures thermiques/hybrides/hydrogène et électriques, calculé sur le cumul annuel par structure + véhicule.</p>
+        <p><b>Carburant BIC :</b> dernier barème officiel disponible, applicable aux dépenses 2025 et publié le 18/02/2026. Le taux est déterminé selon le carburant et la puissance fiscale du véhicule. Il peut être remplacé par un taux fixe dans la structure si nécessaire.</p>
+        <p><a href="https://www.urssaf.fr/accueil/outils-documentation/taux-baremes/indemnites-kilometriques.html" target="_blank" rel="noopener">Source Urssaf IK</a> · <a href="https://bofip.impots.gouv.fr/bofip/2095-PGP.html/identifiant=BOI-BAREME-000003-20260218" target="_blank" rel="noopener">Source BOFiP carburant BIC</a></p>
+      </div>
+    </section>
+
+    <section id="print-report" class="print-only"></section>
+  </main>
+
+  <nav class="bottom-nav screen-only">
+    <button data-tab="trip" class="active">Trajet</button>
+    <button data-tab="history">Historique</button>
+    <button data-tab="reports">Rapports</button>
+    <button data-tab="settings">Réglages</button>
+  </nav>
+
+  <dialog id="companyDialog">
+    <form method="dialog" id="companyForm">
+      <h2 id="companyDialogTitle">Structure</h2>
+      <input type="hidden" id="companyId" />
+      <label>Nom
+        <input id="companyName" required placeholder="Ex. Ma SASU" />
+      </label>
+      <label>Mode de calcul
+        <select id="companyScheme">
+          <option value="ik2026">Barème IK France 2026</option>
+          <option value="bic2025">Barème carburant BIC (dernier officiel : 2025)</option>
+          <option value="fixed">Taux fixe personnalisé</option>
+          <option value="none">Aucun remboursement</option>
+        </select>
+      </label>
+      <label id="fixedRateWrap" class="hidden">Taux fixe €/km
+        <input id="companyFixedRate" type="number" min="0" step="0.001" placeholder="0,139" />
+      </label>
+      <p class="hint">Exemple : tes SASU peuvent utiliser « Barème IK France 2026 » et ton EI LMP « Barème carburant BIC ».</p>
+      <div class="dialog-actions">
+        <button value="cancel">Annuler</button>
+        <button id="saveCompanyDialogBtn" value="default" class="primary">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="vehicleDialog">
+    <form method="dialog" id="vehicleForm">
+      <h2 id="vehicleDialogTitle">Véhicule</h2>
+      <input type="hidden" id="vehicleId" />
+      <label>Nom
+        <input id="vehicleName" required placeholder="Ex. Mercedes GLC" />
+      </label>
+      <label>Puissance fiscale (CV)
+        <input id="vehicleCv" type="number" min="1" max="30" step="1" required />
+      </label>
+      <label>Motorisation pour le barème IK
+        <select id="vehicleElectric">
+          <option value="false">Thermique / hybride / hydrogène</option>
+          <option value="true">100 % électrique</option>
+        </select>
+      </label>
+      <label>Carburant pour le barème BIC
+        <select id="vehicleFuel">
+          <option value="petrol">Super sans plomb</option>
+          <option value="diesel">Gazole</option>
+          <option value="lpg">GPL</option>
+        </select>
+      </label>
+      <div class="dialog-actions">
+        <button value="cancel">Annuler</button>
+        <button id="saveVehicleDialogBtn" value="default" class="primary">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
