@@ -246,6 +246,38 @@ describe('repli entre fournisseurs', () => {
     expect(suggestions).toHaveLength(1);
     expect(suggestions[0].source).toBe('favorite');
   });
+
+  it('remonte l’erreur quand tous les fournisseurs echouent', async () => {
+    const service = createAddressSearchService({
+      favoritePlaceRepository: fakeFavorites([]),
+      recentAddressRepository: fakeRecents(),
+      providers: [
+        {
+          id: 'ban',
+          suggest: async () => {
+            throw new Error('503 Service Unavailable');
+          },
+        },
+      ],
+    });
+
+    const { suggestions, error } = await service.search('grenoble');
+    expect(suggestions).toEqual([]);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain('503');
+  });
+
+  it('ne signale pas d’erreur quand le fournisseur repond simplement « aucun resultat »', async () => {
+    const service = createAddressSearchService({
+      favoritePlaceRepository: fakeFavorites([]),
+      recentAddressRepository: fakeRecents(),
+      providers: [fakeProvider([])],
+    });
+
+    const { suggestions, error } = await service.search('zzzzzzzz');
+    expect(suggestions).toEqual([]);
+    expect(error).toBeNull();
+  });
 });
 
 /* ------------------------------------------------------------------ */

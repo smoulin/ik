@@ -111,7 +111,11 @@ export function createAddressSearchService({
       }
     }
 
-    if (lastError && !providers.some(Boolean)) throw lastError;
+    // Tous les fournisseurs ont echoue : on remonte l'erreur pour que
+    // l'appelant puisse l'afficher. Un resultat vide n'est pas une panne et
+    // reste mis en cache.
+    if (lastError) throw lastError;
+
     writeCache(cacheKey, []);
     return [];
   }
@@ -165,9 +169,15 @@ export function createAddressSearchService({
     cache.clear();
   }
 
-  return { search, searchFavorites, clearCache, get cacheSize() {
-    return cache.size;
-  } };
+  return {
+    search,
+    searchFavorites,
+    clearCache,
+    /** Taille courante du cache memoire — utile au diagnostic. */
+    get cachedQueryCount() {
+      return cache.size;
+    },
+  };
 }
 
 /** Convertit un lieu favori en suggestion affichable. */

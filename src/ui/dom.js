@@ -4,34 +4,22 @@
  */
 
 export const byId = (id) => document.getElementById(id);
-export const qs = (selector, root = document) => root.querySelector(selector);
 export const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
-/** Echappement HTML — a appliquer a TOUTE donnee saisie par l'utilisateur. */
-export function esc(value = '') {
-  return String(value).replace(
-    /[&<>'"]/g,
-    (char) =>
-      ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        "'": '&#39;',
-        '"': '&quot;',
-      })[char],
-  );
-}
-
-/** Cree un element avec ses attributs et ses enfants. */
+/**
+ * Cree un element avec ses attributs et ses enfants.
+ *
+ * Il n'existe volontairement AUCUNE option permettant d'injecter du HTML :
+ * tout texte passe par `text` (donc par textContent) et les enfants sont des
+ * noeuds. Une adresse ou un motif contenant des chevrons ne peut donc pas etre
+ * interprete comme du balisage, sans avoir a echapper quoi que ce soit.
+ */
 export function el(tag, attributes = {}, children = []) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attributes)) {
     if (value === null || value === undefined || value === false) continue;
     if (key === 'class') node.className = value;
     else if (key === 'text') node.textContent = value;
-    // `html` est reserve a du balisage STATIQUE ecrit dans le code source.
-    // Toute donnee saisie par l'utilisateur passe obligatoirement par `text`.
-    else if (key === 'html') node.innerHTML = value;
     else if (key.startsWith('on') && typeof value === 'function') {
       node.addEventListener(key.slice(2).toLowerCase(), value);
     } else if (key === 'dataset') {
