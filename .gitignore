@@ -1,0 +1,25 @@
+node_modules/
+dist/
+dist-ssr/
+.vite/
+coverage/
+
+# Donnees personnelles : ne doivent JAMAIS entrer dans le depot (voir CONTRIBUTING / section Vie privee)
+*.local
+sauvegarde*.json
+agilmea-ik-sauvegarde-*.json
+rapport-kilometrique-*.csv
+/data-perso/
+
+# Editeurs / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Logs
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*

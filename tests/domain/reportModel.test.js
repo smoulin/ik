@@ -1,0 +1,233 @@
+/**
+ * Modele de rapport : presence du beneficiaire et de la structure, periode,
+ * totaux, methode de calcul.
+ *
+ * Ces tests couvrent l'exigence §35 « verifier que les donnees du beneficiaire
+ * et de la structure sont presentes dans les donnees utilisees pour generer
+ * le rapport » — sans dependre d'un navigateur ni d'un moteur PDF.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { buildReport, buildPeriod, REPORT_TITLE } from '../../src/domain/reporting/reportModel.js';
+import { createCompany, createVehicle, createTrip, createBeneficiary } from '../../src/domain/models.js';
+
+const beneficiary = createBeneficiary({
+  id: 'b1',
+  firstName: 'Jean',
+  lastName: 'Dupont',
+  address: { line1: '12 rue Exemple', postalCode: '38000', city: 'Grenoble' },
+});
+
+const company = createCompany({
+  id: 'c1',
+  name: 'SASU A',
+  legalName: 'SASU EXEMPLE',
+  siren: '123456789',
+  siret: '12345678900012',
+  calculationMode: 'ik2026',
+  address: { line1: '5 avenue des Tests', postalCode: '69000', city: 'Lyon' },
+});
+
+const vehicle = createVehicle({ id: 'v1', name: 'GLC', cv: 5, electric: false, fuel: 'diesel' });
+
+const trips = [
+  createTrip({
+    id: 't1',
+    companyId: 'c1',
+    vehicleId: 'v1',
+    date: '2026-08-03',
+    from: 'Grenoble',
+    to: 'Lyon',
+    km: 110,
+    purpose: 'Client X',
+  }),
+  createTrip({
+    id: 't2',
+    companyId: 'c1',
+    vehicleId: 'v1',
+    date: '2026-08-20',
+    from: 'Grenoble',
+    to: 'Chambery',
+    km: 60,
+    roundTrip: true,
+  }),
+  createTrip({
+    id: 't3',
+    companyId: 'c1',
+    vehicleId: 'v1',
+    date: '2026-09-01',
+    from: 'Grenoble',
+    to: 'Valence',
+    km: 90,
+  }),
+];
+
+function report(filters = {}) {
+  return buildReport({
+    trips,
+    companies: [company],
+    vehicles: [vehicle],
+    beneficiary,
+    appVersion: '0.2.0',
+    filters: { companyId: 'c1', from: '2026-08-01', to: '2026-08-31', ...filters },
+    generatedAt: new Date('2026-09-15T10:00:00Z'),
+  });
+}
+
+describe('en-tete du rapport', () => {
+  it('porte le titre « État des frais kilométriques »', () => {
+    expect(report().title).toBe(REPORT_TITLE);
+    expect(REPORT_TITLE).toBe('État des frais kilométriques');
+  });
+
+  it('contient le beneficiaire, nom de famille en majuscules', () => {
+    const block = report().beneficiary;
+    expect(block.present).toBe(true);
+    expect(block.name).toBe('Jean DUPONT');
+    expect(block.addressLines).toEqual(['12 rue Exemple', '38000 Grenoble']);
+    expect(block.lines).toEqual(['Jean DUPONT', '12 rue Exemple', '38000 Grenoble']);
+  });
+
+  it('signale explicitement un beneficiaire absent', () => {
+    const without = buildReport({
+      trips,
+      companies: [company],
+      vehicles: [vehicle],
+      beneficiary: null,
+      filters: { companyId: 'c1' },
+    });
+    expect(without.beneficiary.present).toBe(false);
+    expect(without.beneficiary.lines).toEqual([]);
+  });
+
+  it('contient la structure, son adresse et ses identifiants formates', () => {
+    const block = report().company;
+    expect(block.present).toBe(true);
+    expect(block.displayName).toBe('SASU EXEMPLE');
+    expect(block.addressLines).toEqual(['5 avenue des Tests', '69000 Lyon']);
+    expect(block.identifiers).toEqual(['SIREN 123 456 789', 'SIRET 123 456 789 00012']);
+  });
+
+  it('n’affiche que les identifiants renseignes', () => {
+    const minimal = createCompany({ id: 'c9', name: 'Perso', calculationMode: 'none' });
+    const result = buildReport({
+      trips: [],
+      companies: [minimal],
+      vehicles: [],
+      beneficiary,
+      filters: { companyId: 'c9' },
+    });
+    expect(result.company.identifiers).toEqual([]);
+    expect(result.company.addressLines).toEqual([]);
+  });
+});
+
+describe('periode', () => {
+  it('affiche le mois en toutes lettres quand la periode couvre un mois entier', () => {
+    expect(buildPeriod('2026-08-01', '2026-08-31').label).toBe('Période : août 2026');
+    expect(buildPeriod('2026-08-01', '2026-08-31').isFullMonth).toBe(true);
+  });
+
+  it('gere le mois de fevrier et les annees bissextiles', () => {
+    expect(buildPeriod('2026-02-01', '2026-02-28').label).toBe('Période : février 2026');
+    expect(buildPeriod('2024-02-01', '2024-02-29').label).toBe('Période : février 2024');
+    expect(buildPeriod('2026-02-01', '2026-02-27').label).toBe('Du 01/02/2026 au 27/02/2026');
+  });
+
+  it('affiche les dates exactes sinon', () => {
+    expect(buildPeriod('2026-08-01', '2026-09-15').label).toBe('Du 01/08/2026 au 15/09/2026');
+  });
+
+  it('gere les bornes absentes', () => {
+    expect(buildPeriod('', '').label).toBe('Période : toutes les dates');
+    expect(buildPeriod('2026-08-01', '').label).toBe('À partir du 01/08/2026');
+  });
+});
+
+describe('lignes et totaux', () => {
+  it('ne retient que les trajets de la periode et de la structure', () => {
+    const result = report();
+    expect(result.lines.map((line) => line.id)).toEqual(['t1', 't2']);
+    expect(result.totals.tripCount).toBe(2);
+  });
+
+  it('totalise les kilometres et les indemnites', () => {
+    const result = report();
+    expect(result.totals.km).toBe(170);
+    // 170 km sous 5 000 km cumules -> 170 x 0,636
+    expect(result.totals.amount).toBeCloseTo(108.12, 2);
+  });
+
+  it('calcule le cumul annuel sur TOUS les trajets, pas seulement la periode', () => {
+    const big = createTrip({
+      id: 't0',
+      companyId: 'c1',
+      vehicleId: 'v1',
+      date: '2026-01-05',
+      km: 4990,
+      createdAt: '2026-01-05T00:00:00.000Z',
+    });
+    const result = buildReport({
+      trips: [big, ...trips],
+      companies: [company],
+      vehicles: [vehicle],
+      beneficiary,
+      filters: { companyId: 'c1', from: '2026-08-01', to: '2026-08-31' },
+    });
+    // Le trajet de janvier, hors periode, a deja consomme la premiere tranche.
+    expect(result.totals.amount).toBeLessThan(108.12);
+  });
+
+  it('expose le vehicule et le motif de chaque ligne', () => {
+    const line = report().lines[0];
+    expect(line.vehicleName).toBe('GLC');
+    expect(line.purpose).toBe('Client X');
+    expect(line.dateLabel).toBe('03/08/2026');
+    expect(report().lines[1].roundTrip).toBe(true);
+  });
+
+  it('filtre par vehicule quand il est precise', () => {
+    const other = createVehicle({ id: 'v2', name: 'Zoe', cv: 4, electric: true });
+    const result = buildReport({
+      trips,
+      companies: [company],
+      vehicles: [vehicle, other],
+      beneficiary,
+      filters: { companyId: 'c1', vehicleId: 'v2' },
+    });
+    expect(result.lines).toHaveLength(0);
+  });
+});
+
+describe('methode de calcul et vehicules', () => {
+  it('indique la methode et l’annee du bareme', () => {
+    const result = report();
+    expect(result.calculation.mode).toBe('ik2026');
+    expect(result.calculation.label).toContain('Barème IK France 2026');
+    expect(result.calculation.scaleYear).toBe(2026);
+  });
+
+  it('recapitule les vehicules utilises avec leur puissance fiscale', () => {
+    const result = report();
+    expect(result.vehicles).toHaveLength(1);
+    expect(result.vehicles[0]).toMatchObject({ name: 'GLC', cv: 5, cvApplied: 5, electric: false });
+  });
+
+  it('signale la puissance fiscale reellement appliquee au-dela de 7 CV', () => {
+    const bigCar = createVehicle({ id: 'v3', name: '4x4', cv: 12, fuel: 'diesel' });
+    const t = createTrip({ id: 'x', companyId: 'c1', vehicleId: 'v3', date: '2026-08-05', km: 10 });
+    const result = buildReport({
+      trips: [t],
+      companies: [company],
+      vehicles: [bigCar],
+      beneficiary,
+      filters: { companyId: 'c1' },
+    });
+    expect(result.vehicles[0].cvApplied).toBe(7);
+  });
+
+  it('reporte la version de l’application', () => {
+    expect(report().appVersion).toBe('0.2.0');
+    expect(report().generatedAtLabel).toBe('15/09/2026');
+  });
+});

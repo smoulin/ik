@@ -1,0 +1,72 @@
+name: Déploiement
+
+# Le déploiement n'a lieu QUE depuis la branche de production.
+# Les pushes sur develop et les pull requests sont seulement vérifiés.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  # ------------------------------------------------------------------
+  # Vérification : tests + build. Tourne sur toutes les branches.
+  # ------------------------------------------------------------------
+  verify:
+    name: Tests et build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Chemin de base du site. Adapter si le dépôt est servi à la racine
+          # d'un domaine : mettre "/" ou supprimer cette variable ("./" par défaut).
+          BASE_PATH: ${{ vars.BASE_PATH || './' }}
+
+      - name: Conserver le build
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  # ------------------------------------------------------------------
+  # Publication sur GitHub Pages — uniquement depuis main.
+  # ------------------------------------------------------------------
+  deploy:
+    name: Publication
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Déployer
+        id: deployment
+        uses: actions/deploy-pages@v4

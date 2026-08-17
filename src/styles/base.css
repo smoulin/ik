@@ -1,0 +1,570 @@
+/*
+ * Agilmea IK — styles d'ecran.
+ * Reprise de l'identite visuelle de la v0.1.1, remise en forme lisible et
+ * completee pour l'autocompletion, les lieux favoris et le bandeau de mise a jour.
+ */
+
+:root {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #111827;
+  background: #f3f4f6;
+
+  --primary: #111827;
+  --muted: #6b7280;
+  --border: #d1d5db;
+  --line: #e5e7eb;
+  --danger: #b91c1c;
+  --good: #047857;
+  --favorite: #b45309;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding-bottom: 78px;
+}
+
+/* ----------------------------------------------------------------- */
+/* Structure generale                                                  */
+/* ----------------------------------------------------------------- */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #111827;
+  color: #fff;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 12px #0002;
+}
+
+.app-header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.app-header p {
+  font-size: 12px;
+  margin: 3px 0 0;
+  color: #d1d5db;
+}
+
+main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 14px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 10px #0000000d;
+}
+
+.card.compact {
+  padding: 14px;
+}
+
+.card h2,
+.card h3 {
+  margin: 0 0 14px;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+/* ----------------------------------------------------------------- */
+/* Formulaires                                                         */
+/* ----------------------------------------------------------------- */
+
+.grid {
+  display: grid;
+  gap: 12px;
+}
+
+.grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  margin-bottom: 12px;
+}
+
+input,
+select,
+button,
+.file-button {
+  font: inherit;
+}
+
+input,
+select {
+  width: 100%;
+  margin-top: 6px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid #111827;
+  outline-offset: 1px;
+}
+
+button,
+.file-button {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 13px;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+button.wide {
+  width: 100%;
+  padding: 13px;
+}
+
+button.ghost {
+  background: transparent;
+}
+
+.danger {
+  color: var(--danger) !important;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.route-actions,
+.button-row,
+.section-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inline-check {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 0;
+  font-weight: 500;
+}
+
+.inline-check input {
+  width: auto;
+  margin: 0;
+}
+
+.status {
+  font-size: 13px;
+  margin: 8px 0 12px;
+  min-height: 18px;
+  color: var(--muted);
+}
+
+.status.good {
+  color: var(--good);
+}
+
+.status.bad {
+  color: var(--danger);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.warning {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+/* ----------------------------------------------------------------- */
+/* Autocompletion d'adresse                                            */
+/* ----------------------------------------------------------------- */
+
+.autocomplete {
+  position: relative;
+}
+
+.autocomplete-panel {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px #00000026;
+  overflow: hidden auto;
+  max-height: 300px;
+}
+
+.autocomplete-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  /* Cible tactile confortable au doigt. */
+  padding: 12px 13px;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  font-weight: 400;
+}
+
+.autocomplete-option:last-child {
+  border-bottom: 0;
+}
+
+.autocomplete-option.active,
+.autocomplete-option:hover {
+  background: #f9fafb;
+}
+
+.autocomplete-icon {
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.autocomplete-texts {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.autocomplete-primary {
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.autocomplete-secondary {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Un favori doit se distinguer immediatement d'une proposition en ligne. */
+.autocomplete-option.source-favorite {
+  background: #fffbeb;
+}
+
+.autocomplete-option.source-favorite .autocomplete-icon {
+  color: var(--favorite);
+}
+
+.autocomplete-option.source-favorite .autocomplete-primary {
+  font-weight: 700;
+  color: #92400e;
+}
+
+.autocomplete-option.source-favorite.active,
+.autocomplete-option.source-favorite:hover {
+  background: #fef3c7;
+}
+
+.autocomplete-option.source-recent .autocomplete-icon {
+  color: #2563eb;
+}
+
+/* ----------------------------------------------------------------- */
+/* Listes                                                              */
+/* ----------------------------------------------------------------- */
+
+.trip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.trip-item,
+.settings-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.settings-item + .settings-item {
+  margin-top: 9px;
+}
+
+.trip-main,
+.settings-item-main {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.trip-item strong,
+.settings-item strong {
+  display: block;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.meta.strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.trip-actions,
+.item-actions {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.trip-actions button,
+.item-actions button {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+/* ----------------------------------------------------------------- */
+/* Synthese et tableaux                                                */
+/* ----------------------------------------------------------------- */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.summary {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.summary span {
+  font-size: 12px;
+  color: var(--muted);
+  display: block;
+}
+
+.summary strong {
+  font-size: 20px;
+  display: block;
+  margin-top: 4px;
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 9px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+th.num,
+td.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.small-text {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ----------------------------------------------------------------- */
+/* Navigation, dialogues, bandeau de mise a jour                       */
+/* ----------------------------------------------------------------- */
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 66px;
+  background: #fff;
+  border-top: 1px solid #ddd;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  z-index: 10;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-nav button {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  font-size: 12px;
+}
+
+.bottom-nav button.active {
+  background: #111827;
+  color: #fff;
+}
+
+.file-button {
+  display: inline-block;
+  position: relative;
+}
+
+.file-button input {
+  display: none;
+}
+
+dialog {
+  border: 0;
+  border-radius: 16px;
+  padding: 0;
+  box-shadow: 0 18px 60px #0005;
+  width: min(520px, calc(100% - 24px));
+  max-height: 90vh;
+}
+
+dialog::backdrop {
+  background: #0007;
+}
+
+dialog form {
+  padding: 18px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.update-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  background: #1d4ed8;
+  color: #fff;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.update-banner button {
+  flex-shrink: 0;
+  background: #fff;
+  color: #1d4ed8;
+  border-color: #fff;
+}
+
+.print-only {
+  display: none;
+}
+
+/* ----------------------------------------------------------------- */
+/* Adaptation telephone                                                */
+/* ----------------------------------------------------------------- */
+
+@media (max-width: 620px) {
+  .grid.two {
+    grid-template-columns: 1fr;
+  }
+
+  .route-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .route-actions button {
+    width: 100%;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-head {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .button-row {
+    flex-wrap: wrap;
+  }
+
+  .app-header {
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
+
+  .trip-item,
+  .settings-item {
+    flex-direction: column;
+  }
+
+  .trip-actions,
+  .item-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

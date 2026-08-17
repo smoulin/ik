@@ -1,0 +1,183 @@
+/*
+ * Mise en page imprimable de l'etat des frais kilometriques.
+ *
+ * Sur Android, Chrome propose « Enregistrer au format PDF » depuis la boite
+ * d'impression : cette feuille est donc ce qui definit l'apparence du PDF.
+ */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm 12mm;
+  }
+
+  body {
+    background: #fff;
+    padding: 0;
+    color: #000;
+  }
+
+  .screen-only {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  main {
+    max-width: none;
+    padding: 0;
+  }
+
+  /* --------------------------------------------------------------- */
+  /* En-tete : beneficiaire a gauche, structure a droite               */
+  /* --------------------------------------------------------------- */
+
+  .print-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    padding-bottom: 10px;
+    border-bottom: 1.5pt solid #111;
+    margin-bottom: 16px;
+  }
+
+  .print-party {
+    font-size: 10pt;
+    line-height: 1.45;
+    max-width: 45%;
+  }
+
+  .print-company {
+    text-align: right;
+  }
+
+  .print-party-role {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #555;
+    margin-bottom: 3px;
+  }
+
+  .print-party-name {
+    font-size: 12pt;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .print-party-missing {
+    font-style: italic;
+    color: #777;
+  }
+
+  .print-ids {
+    font-size: 8.5pt;
+    color: #333;
+  }
+
+  /* --------------------------------------------------------------- */
+  /* Titre et periode                                                  */
+  /* --------------------------------------------------------------- */
+
+  .print-title {
+    font-size: 17pt;
+    margin: 0 0 4px;
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+
+  .print-period {
+    text-align: center;
+    font-size: 11pt;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+
+  /* --------------------------------------------------------------- */
+  /* Tableau des trajets                                               */
+  /* --------------------------------------------------------------- */
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 0.5pt solid #999;
+    padding: 4pt 5pt;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .print-table thead th {
+    background: #eee;
+    font-weight: 700;
+    /* Les en-tetes se repetent si le tableau depasse une page. */
+  }
+
+  .print-table thead {
+    display: table-header-group;
+  }
+
+  .print-table tr {
+    break-inside: avoid;
+  }
+
+  .print-table .num {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .print-table tfoot td {
+    background: #f4f4f4;
+    font-weight: 700;
+    border-top: 1pt solid #111;
+  }
+
+  .print-table .total-label {
+    text-align: right;
+  }
+
+  .print-table .total {
+    font-size: 10pt;
+  }
+
+  /* --------------------------------------------------------------- */
+  /* Rappel de la methode de calcul                                    */
+  /* --------------------------------------------------------------- */
+
+  .print-info {
+    margin-top: 14px;
+    border: 0.5pt solid #999;
+    padding: 8pt 10pt;
+    font-size: 8.5pt;
+    break-inside: avoid;
+  }
+
+  .print-info-row {
+    display: flex;
+    gap: 10pt;
+    padding: 1.5pt 0;
+  }
+
+  .print-info-label {
+    min-width: 45mm;
+    color: #444;
+  }
+
+  .print-info-value {
+    font-weight: 600;
+  }
+
+  .print-footer {
+    margin-top: 12px;
+    font-size: 7.5pt;
+    color: #555;
+    line-height: 1.4;
+  }
+}
