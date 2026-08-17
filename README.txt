@@ -1,4 +1,4 @@
-IK Multi-Entreprises — prototype PWA v0.1.0
+IK — prototype PWA v0.1.0
 
 Fonctions incluses
 - Plusieurs structures (SASU, EI LMP, personnel, etc.)
