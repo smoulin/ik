@@ -5,7 +5,14 @@
 import { byId, el, fillSelect, setHidden } from '../dom.js';
 import { attachAddressAutocomplete } from '../components/addressAutocomplete.js';
 import { computeTripAmounts } from '../../domain/mileage/engine.js';
-import { formatKm, formatMoney, formatDateFr, todayIso } from '../../shared/format.js';
+import {
+  formatKm,
+  formatMoney,
+  formatDateFr,
+  todayIso,
+  parseDecimal,
+  formatDecimalInput,
+} from '../../shared/format.js';
 
 export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
   const fields = {
@@ -90,7 +97,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
 
       fromCoords = result.fromCoords;
       toCoords = result.toCoords;
-      fields.km.value = result.km.toFixed(1);
+      fields.km.value = formatDecimalInput(result.km, 1);
 
       const sens = fields.roundTrip.checked ? 'Aller-retour' : 'Aller simple';
       showStatus(`${sens} : ${formatKm(result.km)} · calcul routier OpenStreetMap/OSRM`, 'good');
@@ -108,6 +115,10 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
   /* ---------------------------------------------------------------- */
 
   async function save() {
+    // parseDecimal distingue « champ vide ou illisible » (null) de « 0 saisi » :
+    // sans cette distinction, « 10,5 » enregistrait un trajet a 0 km.
+    const km = parseDecimal(fields.km.value);
+
     const trip = {
       id: editingId || undefined,
       date: fields.date.value,
@@ -117,7 +128,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
       to: fields.to.value.trim(),
       fromCoords,
       toCoords,
-      km: Number(fields.km.value),
+      km,
       purpose: fields.purpose.value.trim(),
       roundTrip: fields.roundTrip.checked,
       distanceSource: fromCoords && toCoords ? 'routing' : 'manual',
@@ -126,6 +137,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     const problem = validate(trip);
     if (problem) {
       showStatus(problem, 'bad');
+      fields.km.focus();
       return;
     }
 
@@ -150,7 +162,9 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     if (!trip.vehicleId) return 'Choisis un véhicule.';
     if (!trip.from) return 'Indique le point de départ.';
     if (!trip.to) return 'Indique la destination.';
-    if (!Number.isFinite(trip.km) || trip.km < 0) return 'Indique une distance valide.';
+    if (trip.km === null) return 'Indique la distance en kilomètres (ex. 10,5).';
+    if (trip.km < 0) return 'La distance ne peut pas être négative.';
+    if (trip.km === 0) return 'La distance est à 0 km : corrige-la ou lance le calcul.';
     return null;
   }
 
@@ -180,7 +194,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     fields.vehicle.value = trip.vehicleId;
     fromAutocomplete.setValue(trip.from);
     toAutocomplete.setValue(trip.to);
-    fields.km.value = trip.km;
+    fields.km.value = formatDecimalInput(trip.km);
     fields.purpose.value = trip.purpose || '';
     fields.roundTrip.checked = Boolean(trip.roundTrip);
     fromCoords = trip.fromCoords;
@@ -203,7 +217,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     fields.vehicle.value = trip.vehicleId;
     fromAutocomplete.setValue(trip.from);
     toAutocomplete.setValue(trip.to);
-    fields.km.value = trip.km;
+    fields.km.value = formatDecimalInput(trip.km);
     fields.purpose.value = trip.purpose || '';
     fields.roundTrip.checked = Boolean(trip.roundTrip);
     fromCoords = trip.fromCoords;

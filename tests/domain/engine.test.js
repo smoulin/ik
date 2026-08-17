@@ -129,7 +129,8 @@ describe('autres modes de calcul', () => {
     const result = computeTripAmounts([t], context).get('t');
     // 5 CV gazole -> 0,110 €/km
     expect(result.amount).toBeCloseTo(22, 6);
-    expect(result.rateInfo).toBe('0.110 €/km');
+    // Taux affiche a la francaise, virgule comprise.
+    expect(result.rateInfo).toBe('0,110 €/km');
   });
 
   it('applique le taux personnalise de la structure', () => {
@@ -151,11 +152,11 @@ describe('autres modes de calcul', () => {
 describe('calculationModeLabel', () => {
   it('n’invente pas de taux BIC sans vehicule', () => {
     expect(calculationModeLabel(bicCompany)).toContain('selon le véhicule');
-    expect(calculationModeLabel(bicCompany, vehicle)).toContain('0.110');
+    expect(calculationModeLabel(bicCompany, vehicle)).toContain('0,110 €/km');
   });
 
   it('affiche le taux personnalise', () => {
-    expect(calculationModeLabel(fixedCompany)).toContain('0.250');
+    expect(calculationModeLabel(fixedCompany)).toContain('0,250 €/km');
   });
 
   it('gere l’absence de structure', () => {

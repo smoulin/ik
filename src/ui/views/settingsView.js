@@ -8,6 +8,7 @@ import { attachAddressAutocomplete } from '../components/addressAutocomplete.js'
 import { suggestionToAddress } from '../../services/geo/types.js';
 import { calculationModeLabel } from '../../domain/mileage/engine.js';
 import { formatAddressOneLine, isAddressEmpty, composeAddressLabel } from '../../domain/models.js';
+import { parseDecimal, formatDecimalInput } from '../../shared/format.js';
 import { buildBackup, restoreBackup, inspectBackup } from '../../services/backup/backupService.js';
 import { GEO_ATTRIBUTIONS } from '../../services/geo/index.js';
 
@@ -127,7 +128,7 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     companyFields.postalCode.value = company?.address?.postalCode || '';
     companyFields.city.value = company?.address?.city || '';
     companyFields.scheme.value = company?.calculationMode || 'ik2026';
-    companyFields.fixedRate.value = company?.calculationSettings?.fixedRate ?? '';
+    companyFields.fixedRate.value = formatDecimalInput(company?.calculationSettings?.fixedRate);
     companyAddressCoords = company?.address?.latitude
       ? { latitude: company.address.latitude, longitude: company.address.longitude }
       : null;
@@ -144,11 +145,21 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
       window.alert('Indique un nom.');
       return;
     }
-    const fixedRate = Number(companyFields.fixedRate.value || 0);
-    if (companyFields.scheme.value === 'fixed' && !(fixedRate >= 0)) {
-      window.alert('Taux invalide.');
+    // Le taux se saisit « 0,139 » : la virgule doit etre acceptee (voir parseDecimal).
+    const parsedRate = parseDecimal(companyFields.fixedRate.value);
+    const isFixed = companyFields.scheme.value === 'fixed';
+
+    if (isFixed && parsedRate === null) {
+      window.alert('Indique le taux en euros par kilomètre (ex. 0,139).');
+      companyFields.fixedRate.focus();
       return;
     }
+    if (isFixed && parsedRate <= 0) {
+      window.alert('Le taux doit être supérieur à 0.');
+      companyFields.fixedRate.focus();
+      return;
+    }
+    const fixedRate = parsedRate ?? 0;
 
     await store.saveCompany({
       id: companyFields.id.value || undefined,
@@ -297,8 +308,8 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
       if (suggestion.city) placeFields.city.value = suggestion.city;
       // Coordonnées mémorisées : la même recherche ne sera plus jamais refaite (§34).
       if (Number.isFinite(suggestion.latitude)) {
-        placeFields.latitude.value = suggestion.latitude;
-        placeFields.longitude.value = suggestion.longitude;
+        placeFields.latitude.value = formatDecimalInput(suggestion.latitude);
+        placeFields.longitude.value = formatDecimalInput(suggestion.longitude);
       }
     },
     onInput: () => {
@@ -315,8 +326,8 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     placeFields.address.value = place?.address?.line1 || place?.address?.label || '';
     placeFields.postalCode.value = place?.address?.postalCode || '';
     placeFields.city.value = place?.address?.city || '';
-    placeFields.latitude.value = place?.latitude ?? '';
-    placeFields.longitude.value = place?.longitude ?? '';
+    placeFields.latitude.value = formatDecimalInput(place?.latitude);
+    placeFields.longitude.value = formatDecimalInput(place?.longitude);
     placeDialog.showModal();
   }
 
@@ -345,8 +356,8 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
         city: placeFields.city.value,
         country: 'FR',
       },
-      latitude: placeFields.latitude.value === '' ? null : Number(placeFields.latitude.value),
-      longitude: placeFields.longitude.value === '' ? null : Number(placeFields.longitude.value),
+      latitude: parseDecimal(placeFields.latitude.value),
+      longitude: parseDecimal(placeFields.longitude.value),
     });
 
     placeDialog.close();

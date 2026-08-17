@@ -10,6 +10,7 @@ import { CALCULATION_MODES } from '../models.js';
 import { annualIkAmount, ikBracketLabel, getIkScale, normalizeCv } from './ikScale.js';
 import { bicRate, getBicScale } from './bicScale.js';
 import { CURRENT_IK_SCALE_YEAR, CURRENT_BIC_SCALE_YEAR } from './scales.js';
+import { formatRate } from '../../shared/format.js';
 
 /**
  * Perimetre sur lequel s'apprecie le cumul annuel du bareme kilometrique.
@@ -124,8 +125,8 @@ function computeOne({ company, vehicle, km, beforeKm, afterKm }) {
         ...base,
         amount: km * rate,
         rate,
-        rateInfo: `${rate.toFixed(3)} €/km`,
-        method: `${scale.label} (${rate.toFixed(3)} €/km)`,
+        rateInfo: formatRate(rate),
+        method: `${scale.label} (${formatRate(rate)})`,
         scaleYear: scale.year,
       };
     }
@@ -136,8 +137,8 @@ function computeOne({ company, vehicle, km, beforeKm, afterKm }) {
         ...base,
         amount: km * rate,
         rate,
-        rateInfo: `${rate.toFixed(3)} €/km`,
-        method: `Taux personnalisé (${rate.toFixed(3)} €/km)`,
+        rateInfo: formatRate(rate),
+        method: `Taux personnalisé (${formatRate(rate)})`,
         scaleYear: null,
       };
     }
@@ -166,11 +167,11 @@ export function calculationModeLabel(company, vehicle = null) {
     case CALCULATION_MODES.BIC: {
       const scale = getBicScale();
       if (!vehicle) return `${scale.label} (taux selon le véhicule)`;
-      return `${scale.label} (${bicRate(vehicle).toFixed(3)} €/km)`;
+      return `${scale.label} (${formatRate(bicRate(vehicle))})`;
     }
     case CALCULATION_MODES.FIXED: {
       const rate = Number(company?.calculationSettings?.fixedRate) || 0;
-      return `Taux personnalisé ${rate.toFixed(3)} €/km`;
+      return `Taux personnalisé ${formatRate(rate)}`;
     }
     default:
       return 'Aucun remboursement';

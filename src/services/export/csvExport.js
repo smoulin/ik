@@ -22,6 +22,32 @@ export const CSV_HEADER = [
 ];
 
 /**
+ * Colonnes contenant du texte libre saisi par l'utilisateur.
+ * Seules celles-ci sont protegees contre l'interpretation en formule ;
+ * les colonnes Date, Kilometres et Montant restent des valeurs brutes,
+ * pour que le tableur continue de les traiter comme des nombres et des dates.
+ */
+const TEXT_COLUMN_INDEXES = new Set([1, 2, 3, 4, 5, 8]);
+
+/** Caracteres qui font demarrer une formule dans Excel, LibreOffice et Sheets. */
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
+/**
+ * Neutralise l'interpretation d'un champ texte comme formule de tableur.
+ *
+ * Sans cela, un motif aussi banal que « -50 % remise » ou « + frais de parking »
+ * s'affiche « #NOM? » dans Excel au lieu du texte saisi, et « =HYPERLINK(...) »
+ * deviendrait un lien cliquable.
+ *
+ * L'apostrophe de tete est la convention des tableurs : elle force le format
+ * texte et n'est PAS affichee dans la cellule.
+ */
+export function escapeCsvFormula(value) {
+  const text = String(value ?? '');
+  return FORMULA_PREFIX.test(text) ? `'${text}` : text;
+}
+
+/**
  * @param {object} report  objet produit par buildReport()
  * @param {{companyName: string}} context
  */
@@ -42,10 +68,19 @@ export function buildCsv(report, { companyName = '' } = {}) {
   // et se perdrait au moindre changement d'encodage du fichier source.
   const BOM = String.fromCharCode(0xfeff);
 
+  const encodeCell = (value, columnIndex, isHeader) => {
+    const raw = isHeader || !TEXT_COLUMN_INDEXES.has(columnIndex)
+      ? String(value ?? '')
+      : escapeCsvFormula(value);
+    return `"${raw.replace(/"/g, '""')}"`;
+  };
+
   return (
     BOM +
     [CSV_HEADER, ...rows]
-      .map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(';'))
+      .map((row, rowIndex) =>
+        row.map((value, columnIndex) => encodeCell(value, columnIndex, rowIndex === 0)).join(';'),
+      )
       .join('\r\n')
   );
 }

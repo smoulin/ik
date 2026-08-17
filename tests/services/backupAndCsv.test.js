@@ -8,7 +8,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase } from '../helpers/db.js';
 import { buildBackup, restoreBackup, inspectBackup } from '../../src/services/backup/backupService.js';
-import { buildCsv, CSV_HEADER, csvFileName } from '../../src/services/export/csvExport.js';
+import {
+  buildCsv,
+  CSV_HEADER,
+  csvFileName,
+  escapeCsvFormula,
+} from '../../src/services/export/csvExport.js';
 import {
   companyRepository,
   vehicleRepository,
@@ -172,5 +177,80 @@ describe('export CSV', () => {
 
   it('nomme le fichier a partir de la structure et de la periode', () => {
     expect(csvFileName(report, { companyName: 'SASU A' })).toBe('agilmea-ik-sasu-a-2026-08-01.csv');
+  });
+
+  it('assainit le nom de fichier meme si la structure contient du balisage', () => {
+    const name = csvFileName(report, { companyName: '<img src=x onerror=alert(1)>SASU' });
+    expect(name).toBe('agilmea-ik-img-src-x-onerror-alert-1-sasu-2026-08-01.csv');
+    expect(name).not.toMatch(/[<>"'/\\]/);
+  });
+});
+
+describe('protection contre l’injection de formule dans le CSV', () => {
+  const csvCompany = createCompany({ id: 'c1', name: 'SASU A', calculationMode: 'ik2026' });
+  const csvVehicle = createVehicle({ id: 'v1', name: 'GLC', cv: 5, fuel: 'diesel' });
+
+  const reportWith = (purpose) =>
+    buildReport({
+      trips: [
+        createTrip({
+          id: 'r1',
+          companyId: 'c1',
+          vehicleId: 'v1',
+          date: '2026-08-01',
+          from: 'Grenoble',
+          to: 'Lyon',
+          km: 110.4,
+          purpose,
+        }),
+      ],
+      companies: [csvCompany],
+      vehicles: [csvVehicle],
+      beneficiary: null,
+      filters: { companyId: 'c1', from: '2026-08-01', to: '2026-08-31' },
+    });
+
+  it('neutralise les caracteres qui declenchent une formule', () => {
+    // Cas realistes : sans protection, Excel affiche « #NOM? » a la place du texte.
+    expect(escapeCsvFormula('-50 % remise client')).toBe("'-50 % remise client");
+    expect(escapeCsvFormula('+ frais de parking')).toBe("'+ frais de parking");
+    expect(escapeCsvFormula('=HYPERLINK("http://exemple","clic")')).toBe(
+      '\'=HYPERLINK("http://exemple","clic")',
+    );
+    expect(escapeCsvFormula('@midi rendez-vous')).toBe("'@midi rendez-vous");
+    expect(escapeCsvFormula('\tTabulation')).toBe("'\tTabulation");
+  });
+
+  it('laisse intact un texte ordinaire', () => {
+    expect(escapeCsvFormula('Rendez-vous client')).toBe('Rendez-vous client');
+    expect(escapeCsvFormula('Grenoble')).toBe('Grenoble');
+    expect(escapeCsvFormula('')).toBe('');
+    expect(escapeCsvFormula(null)).toBe('');
+  });
+
+  it('protege le motif dans le fichier produit', () => {
+    const csv = buildCsv(reportWith('-50 % remise client'), { companyName: 'SASU A' });
+    expect(csv).toContain('"\'-50 % remise client"');
+  });
+
+  it('protege aussi le nom de la structure', () => {
+    const csv = buildCsv(reportWith('Client X'), { companyName: '=cmd|calc' });
+    expect(csv).toContain('"\'=cmd|calc"');
+  });
+
+  it('ne touche PAS aux colonnes numeriques et a la date', () => {
+    const csv = buildCsv(reportWith('Client X'), { companyName: 'SASU A' });
+    const dataLine = csv.split('\r\n')[1].split(';');
+    // Date, Kilometres et Montant doivent rester exploitables comme tels.
+    expect(dataLine[0]).toBe('"2026-08-01"');
+    expect(dataLine[6]).toBe('"110.4"');
+    expect(dataLine[7]).toBe('"70.21"');
+  });
+
+  it('n’altere pas la ligne d’en-tete', () => {
+    const header = buildCsv(reportWith('Client X'), { companyName: 'SASU A' })
+      .replace(new RegExp(`^${String.fromCharCode(0xfeff)}`), '')
+      .split('\r\n')[0];
+    expect(header).not.toContain("'");
   });
 });
