@@ -134,14 +134,19 @@ export function createReportsView({ store, appVersion }) {
       missing.push('l’adresse de la structure (Réglages → Structures)');
     }
 
-    if (!missing.length) return;
+    if (missing.length) {
+      container.append(
+        el('p', {
+          class: 'status bad',
+          text: `À compléter pour un rapport exploitable : ${missing.join(', ')}.`,
+        }),
+      );
+    }
 
-    container.append(
-      el('p', {
-        class: 'status bad',
-        text: `À compléter pour un rapport exploitable : ${missing.join(', ')}.`,
-      }),
-    );
+    // Avertissements métier (périmètre du cumul annuel du barème).
+    for (const warning of report.warnings || []) {
+      container.append(el('p', { class: 'status warn', text: `⚠ ${warning.message}` }));
+    }
   }
 
   function summary(label, value) {

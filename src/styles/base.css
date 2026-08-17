@@ -205,6 +205,16 @@ button.ghost {
   color: var(--danger);
 }
 
+/* Avertissement métier : à lire, sans être une erreur bloquante. */
+.status.warn {
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  padding: 10px 12px;
+  line-height: 1.45;
+}
+
 .hint {
   font-size: 12px;
   color: var(--muted);

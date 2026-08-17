@@ -14,7 +14,13 @@ import {
   isAddressEmpty,
   isBeneficiaryEmpty,
 } from '../models.js';
-import { computeTripAmounts, calculationModeLabel, scaleYearForCompany } from '../mileage/engine.js';
+import {
+  computeTripAmounts,
+  calculationModeLabel,
+  scaleYearForCompany,
+  IK_ACCUMULATION_SCOPE,
+} from '../mileage/engine.js';
+import { CALCULATION_MODES } from '../models.js';
 import { normalizeCv } from '../mileage/ikScale.js';
 import { formatDateFr, formatMonthFr, lastDayOfMonth } from '../../shared/format.js';
 
@@ -96,10 +102,72 @@ export function buildReport({
     calculation: buildCalculationBlock(company, lines, vehicleById),
     lines,
     totals,
+    warnings: buildWarnings({ company, companies, trips, lines }),
     generatedAt: generatedAt.toISOString(),
     generatedAtLabel: formatDateFr(toIsoDate(generatedAt)),
     appVersion,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Avertissements                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Signale le seul cas ou le perimetre de cumul retenu peut preter a discussion.
+ *
+ * Le cumul annuel est apprecie par structure + vehicule + annee. Tant qu'un
+ * vehicule ne sert qu'a une seule structure au bareme kilometrique, ce
+ * perimetre ne change rien. En revanche, si DEUX structures ou plus utilisent
+ * le bareme kilometrique avec LE MEME vehicule la meme annee, chacune repart
+ * de la premiere tranche : le total indemnise depasse alors ce que le bareme
+ * accorderait pour ce vehicule.
+ *
+ * On n'impose rien — c'est un choix assume — mais l'utilisateur doit le savoir
+ * au moment ou le cas se produit reellement, et pas six mois plus tard.
+ */
+export function buildWarnings({ company, companies = [], trips = [], lines = [] }) {
+  const warnings = [];
+
+  if (company?.calculationMode !== CALCULATION_MODES.IK) return warnings;
+  if (IK_ACCUMULATION_SCOPE !== 'company-vehicle-year') return warnings;
+
+  const ikCompanyIds = new Set(
+    companies.filter((c) => c.calculationMode === CALCULATION_MODES.IK).map((c) => c.id),
+  );
+  if (ikCompanyIds.size < 2) return warnings;
+
+  const years = new Set(lines.map((line) => String(line.date).slice(0, 4)));
+  const vehicleIds = new Set(lines.map((line) => line.vehicleId));
+
+  for (const vehicleId of vehicleIds) {
+    for (const year of years) {
+      const sharingCompanies = new Set(
+        trips
+          .filter((trip) => !trip.deletedAt)
+          .filter((trip) => trip.vehicleId === vehicleId)
+          .filter((trip) => String(trip.date).slice(0, 4) === year)
+          .filter((trip) => ikCompanyIds.has(trip.companyId))
+          .map((trip) => trip.companyId),
+      );
+
+      if (sharingCompanies.size > 1) {
+        const names = companies
+          .filter((c) => sharingCompanies.has(c.id))
+          .map((c) => c.name)
+          .join(', ');
+        warnings.push({
+          code: 'ik-scope-shared-vehicle',
+          message:
+            `En ${year}, ce véhicule sert au barème kilométrique pour plusieurs structures (${names}). ` +
+            'Chacune repart de la première tranche du barème, ce qui augmente le total indemnisé. ' +
+            'Ce fonctionnement est volontaire — à confirmer avec ton expert-comptable.',
+        });
+      }
+    }
+  }
+
+  return warnings;
 }
 
 /* ------------------------------------------------------------------ */

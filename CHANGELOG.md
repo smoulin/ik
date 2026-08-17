@@ -8,6 +8,26 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+### Ajouté
+- **Avertissement dans le rapport** lorsqu'un même véhicule sert au barème
+  kilométrique pour plusieurs structures la même année : chacune repart alors de
+  la première tranche, ce qui augmente le total indemnisé. Le comportement reste
+  volontaire, mais il est désormais signalé au moment où le cas se produit.
+
+### Corrigé
+- **Distance enregistrée à 0 km silencieusement.** Sur un clavier français,
+  saisir « 10,5 » dans un champ `type="number"` vidait le champ : le trajet était
+  enregistré à 0 km / 0 €. Les champs distance, taux personnalisé et coordonnées
+  acceptent maintenant la virgule, et un champ vide, illisible ou à zéro est
+  refusé explicitement au lieu d'être enregistré. Même défaut corrigé sur le taux
+  personnalisé, dont le format attendu est « 0,139 ».
+- **Injection de formule dans l'export CSV.** Un motif tel que « -50 % remise »
+  ou « + frais de parking » était interprété comme une formule par Excel, qui
+  affichait « #NOM? ». Les champs texte concernés sont désormais neutralisés ;
+  les colonnes Date, Kilomètres et Montant restent des valeurs exploitables.
+- Les taux s'affichent à la française — « 0,139 €/km » — à l'écran, dans le
+  rapport et dans la colonne « Calcul » du CSV.
+
 ## [0.2.0] — 2026-08-17
 
 ### Ajouté

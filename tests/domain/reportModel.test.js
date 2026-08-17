@@ -199,6 +199,81 @@ describe('lignes et totaux', () => {
   });
 });
 
+describe('avertissement sur le partage d’un vehicule entre structures', () => {
+  const sasuA = createCompany({ id: 'a', name: 'SASU A', calculationMode: 'ik2026' });
+  const sasuB = createCompany({ id: 'b', name: 'SASU B', calculationMode: 'ik2026' });
+  const eiLmp = createCompany({ id: 'e', name: 'EI LMP', calculationMode: 'bic2025' });
+  const car = createVehicle({ id: 'v1', name: 'GLC', cv: 5, fuel: 'diesel' });
+
+  const tripFor = (companyId, date, id) =>
+    createTrip({ id, companyId, vehicleId: 'v1', date, from: 'A', to: 'B', km: 100 });
+
+  it('avertit quand deux structures au bareme IK partagent le meme vehicule la meme annee', () => {
+    const result = buildReport({
+      trips: [tripFor('a', '2026-08-03', 't1'), tripFor('b', '2026-08-04', 't2')],
+      companies: [sasuA, sasuB],
+      vehicles: [car],
+      beneficiary,
+      filters: { companyId: 'a' },
+    });
+
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0].code).toBe('ik-scope-shared-vehicle');
+    expect(result.warnings[0].message).toContain('SASU A');
+    expect(result.warnings[0].message).toContain('SASU B');
+    expect(result.warnings[0].message).toContain('2026');
+  });
+
+  it('n’avertit pas quand les structures utilisent des baremes differents', () => {
+    // Cas courant : une SASU au barème kilométrique, une EI au barème carburant.
+    const result = buildReport({
+      trips: [tripFor('a', '2026-08-03', 't1'), tripFor('e', '2026-08-04', 't2')],
+      companies: [sasuA, eiLmp],
+      vehicles: [car],
+      beneficiary,
+      filters: { companyId: 'a' },
+    });
+
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('n’avertit pas si une seule structure utilise le vehicule', () => {
+    const result = buildReport({
+      trips: [tripFor('a', '2026-08-03', 't1'), tripFor('a', '2026-08-04', 't2')],
+      companies: [sasuA, sasuB],
+      vehicles: [car],
+      beneficiary,
+      filters: { companyId: 'a' },
+    });
+
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('n’avertit pas si le partage porte sur deux annees differentes', () => {
+    const result = buildReport({
+      trips: [tripFor('a', '2026-08-03', 't1'), tripFor('b', '2025-08-04', 't2')],
+      companies: [sasuA, sasuB],
+      vehicles: [car],
+      beneficiary,
+      filters: { companyId: 'a' },
+    });
+
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('n’avertit pas sur un rapport d’une structure hors bareme IK', () => {
+    const result = buildReport({
+      trips: [tripFor('a', '2026-08-03', 't1'), tripFor('e', '2026-08-04', 't2')],
+      companies: [sasuA, eiLmp],
+      vehicles: [car],
+      beneficiary,
+      filters: { companyId: 'e' },
+    });
+
+    expect(result.warnings).toEqual([]);
+  });
+});
+
 describe('methode de calcul et vehicules', () => {
   it('indique la methode et l’annee du bareme', () => {
     const result = report();
