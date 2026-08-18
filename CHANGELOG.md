@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.5.0] — 2026-08-18
+
 ### Ajouté
 - **Enregistrement automatique des trajets par le GPS.** Une trace GPX produite
   par GPSLogger — déclenchée par la connexion Bluetooth du véhicule — s'importe
