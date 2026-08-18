@@ -1,5 +1,5 @@
 /**
- * Onglet « Tous les trajets » : navigation mois par mois, trajets regroupés
+ * Onglet « Historique » : navigation mois par mois, trajets regroupés
  * par jour, chacun dépliable.
  *
  * La carte n'est chargée qu'au dépliage d'un trajet : afficher un fond
@@ -28,7 +28,13 @@ const MOIS = [
   'décembre',
 ];
 
-export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () => {} }) {
+export function createHistoryView({
+  store,
+  onEdit,
+  onDuplicate,
+  onAddForDate = () => {},
+  onChanged = () => {},
+}) {
   const companyFilter = byId('historyCompany');
   const list = byId('historyList');
   const totals = byId('historyTotals');
@@ -60,16 +66,6 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
     });
   }
 
-  byId('clearTripsBtn').addEventListener('click', async () => {
-    if (!store.state.trips.length) return;
-    const confirmed = window.confirm(
-      'Supprimer TOUS les trajets ? Cette action est irréversible sans sauvegarde.',
-    );
-    if (!confirmed) return;
-    await store.deleteAllTrips();
-    onChanged();
-  });
-
   /** Avance ou recule d'une unite de la granularite courante. */
   function shiftPeriod(delta) {
     const d = new Date(cursor);
@@ -92,6 +88,20 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
     if (scope === 'day') return `${year}-${month}-${day}`;
     if (scope === 'month') return `${year}-${month}`;
     return String(year);
+  }
+
+  /**
+   * La periode affichee est-elle deja celle d'aujourd'hui ? Le lien
+   * « Aujourd'hui » n'a alors aucun effet : le montrer laisse croire qu'il est
+   * casse, puisque cliquer ne change rien a l'ecran.
+   */
+  function isCurrentPeriod() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const today = scope === 'day' ? `${year}-${month}-${day}` : scope === 'month' ? `${year}-${month}` : String(year);
+    return periodPrefix() === today;
   }
 
   function periodLabel() {
@@ -137,6 +147,7 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
 
   function render() {
     monthLabel.textContent = periodLabel();
+    setHidden(byId('todayBtn'), isCurrentPeriod());
 
     const trips = selectedTrips();
     const computations = computeTripAmounts(store.state.trips, {
@@ -185,6 +196,16 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
         }),
       ]),
       ...dayTrips.map((trip) => renderTrip(trip, computations.get(trip.id))),
+      // Ajout direct a la date du groupe : saisir un trajet oublie sans avoir
+      // a rechercher la date dans le formulaire.
+      el('button', {
+        class: 'day-add',
+        type: 'button',
+        text: '+',
+        title: `Ajouter un trajet le ${formatDayLabel(date)}`,
+        'aria-label': `Ajouter un trajet le ${formatDayLabel(date)}`,
+        onClick: () => onAddForDate(date),
+      }),
     ]);
   }
 
@@ -218,6 +239,8 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
               .filter(Boolean)
               .join(' · '),
           }),
+          // Le motif justifie le trajet : il se lit sans avoir a deplier.
+          trip.purpose ? el('div', { class: 'trip-purpose', text: trip.purpose }) : null,
         ]),
         el('div', { class: 'trip-figures' }, [
           el('div', { class: 'km', text: formatKm(trip.km) }),
@@ -235,10 +258,10 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
     const mapNode = el('div', { class: 'route-map' });
 
     const details = el('div', { class: 'trip-details' }, [
-      trip.purpose ? el('div', { class: 'meta strong', text: `Motif : ${trip.purpose}` }) : null,
+      // Le motif est desormais porte par la ligne repliee : ne pas le repeter ici.
       el('div', { class: 'meta', text: computed?.rateInfo || '' }),
       mapNode,
-      el('div', { class: 'button-row' }, [
+      el('div', { class: 'button-row equal' }, [
         el('button', { text: 'Modifier', onClick: () => onEdit(trip.id) }),
         el('button', { text: 'Dupliquer', onClick: () => onDuplicate(trip.id) }),
         el('button', { class: 'danger', text: 'Supprimer', onClick: () => remove(trip.id) }),

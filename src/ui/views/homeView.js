@@ -1,5 +1,5 @@
 /**
- * Onglet « Accueil » : traces enregistrées par le GPS, en attente de validation.
+ * Onglet « À valider » : traces enregistrées par le GPS, en attente de validation.
  *
  * Une trace est une mesure brute — distance réellement parcourue, horaires,
  * tracé — mais elle ne sait ni à quelle structure elle appartient, ni pourquoi

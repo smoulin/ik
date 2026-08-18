@@ -1,9 +1,9 @@
 /**
  * Assemblage de l'interface : onglets, vues, invite d'installation.
  *
- * La navigation compte cinq entrées : Accueil (trajets enregistrés par le GPS,
- * à valider), Tous les trajets, le bouton d'ajout au centre, Rapports et
- * Réglages.
+ * La navigation compte cinq entrées : À valider (trajets enregistrés par le
+ * GPS, en attente de validation), Historique, le bouton d'ajout au centre,
+ * Rapports et Réglages.
  */
 
 import { byId, qsa, setHidden } from './dom.js';
@@ -59,6 +59,11 @@ export async function createApp({ appVersion }) {
     },
     onDuplicate: (id) => {
       tripView.duplicate(id);
+      switchTab('trip');
+    },
+    // « + » sous un jour de l'historique : formulaire vierge, deja date.
+    onAddForDate: (date) => {
+      tripView.startForDate(date);
       switchTab('trip');
     },
     onChanged: () => refreshAll(),

@@ -117,6 +117,45 @@ main {
   margin: 0 0 14px;
 }
 
+/* Carte repliable : <details> natif, le titre sert de bouton d'ouverture. */
+.card.collapsible > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.card.collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.card.collapsible > summary h2 {
+  margin: 0;
+}
+
+/* Chevron construit en CSS : deux bords tournes, aucune image a charger. */
+.card.collapsible > summary::after {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 3px;
+  border-right: 2px solid var(--brand-ink-soft);
+  border-bottom: 2px solid var(--brand-ink-soft);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.card.collapsible[open] > summary::after {
+  transform: translateY(2px) rotate(-135deg);
+}
+
+.card.collapsible[open] > summary {
+  margin-bottom: 14px;
+}
+
 .tab-panel {
   display: none;
 }
@@ -132,6 +171,9 @@ main {
 .grid {
   display: grid;
   gap: 12px;
+  /* Meme respiration qu'un label seul : le rythme vertical reste a 12px,
+     qu'un champ soit dans une grille ou non. */
+  margin-bottom: 12px;
 }
 
 .grid.two {
@@ -143,6 +185,11 @@ label {
   font-size: 13px;
   font-weight: 650;
   margin-bottom: 12px;
+}
+
+/* Dans une grille, c'est le `gap` qui espace : la marge du label s'ajouterait. */
+.grid label {
+  margin-bottom: 0;
 }
 
 input,
@@ -220,6 +267,21 @@ button.ghost {
 .button-row + button.wide,
 .button-row + .button-row {
   margin-top: 14px;
+}
+
+/* Rangée de boutons de même poids : colonnes égales plutôt qu'un flux qui
+   se replie dès que l'un des libellés s'allonge. */
+.button-row.equal {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.button-row.equal button {
+  padding: 10px 4px;
+  font-size: 13px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .inline-check {
@@ -304,8 +366,13 @@ button.ghost {
   margin-top: 4px;
 }
 
-/* Carte : hauteur fixe, sinon Leaflet ne sait pas se dimensionner. */
+/* Carte : hauteur fixe, sinon Leaflet ne sait pas se dimensionner.
+   `z-index: 0` cree un contexte d'empilement : sans lui, les calques Leaflet
+   (z-index 400 a 1000) se comparent a la barre de navigation fixe (z-index 10)
+   et lui passent par-dessus des que la carte defile devant elle. */
 .route-map {
+  position: relative;
+  z-index: 0;
   height: 320px;
   margin: 10px 0 14px;
   border: 1px solid var(--border);
@@ -617,6 +684,11 @@ td.num {
   height: 100%;
   color: var(--muted);
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   padding: 0 4px;
   line-height: 1.25;
 }
@@ -627,17 +699,25 @@ td.num {
   box-shadow: inset 0 2px 0 var(--primary);
 }
 
-.nav-label {
-  display: block;
-  overflow-wrap: anywhere;
+/* Le trait de l'icone suit `color`, donc l'etat actif la teinte avec le texte. */
+.nav-icon {
+  width: 22px;
+  height: 22px;
+  flex: none;
 }
 
-/* Compteur de trajets en attente de validation. */
+/* Les libelles tiennent sur une ligne : un depassement doit se voir, pas se replier. */
+.nav-label {
+  display: block;
+  white-space: nowrap;
+}
+
+/* Compteur de trajets en attente de validation, cale sur le coin de l'icone. */
 .nav-badge {
   position: absolute;
-  top: 8px;
+  top: 6px;
   right: 50%;
-  transform: translateX(22px);
+  transform: translateX(20px);
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -669,11 +749,12 @@ td.num {
 }
 
 /* ----------------------------------------------------------------- */
-/* Accueil et navigation mensuelle                                     */
+/* À valider et navigation mensuelle                                   */
 /* ----------------------------------------------------------------- */
 
-.auto-record strong {
-  display: block;
+/* Le titre coiffe directement sa ligne d'etat : pas la marge d'un titre de carte. */
+.auto-record h2 {
+  margin-bottom: 4px;
 }
 
 .month-nav {
@@ -774,6 +855,28 @@ td.num {
 .trip-endpoints {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* Motif : la justification du trajet, lisible sans deplier. */
+.trip-purpose {
+  font-size: 12px;
+  color: var(--brand-ink-soft);
+  font-weight: 650;
+  margin-top: 2px;
+}
+
+/* Ajout d'un trajet a la date du groupe, sous le dernier trajet du jour. */
+.day-add {
+  display: block;
+  margin: 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--brand-ink-soft);
 }
 
 .trip-endpoint {
@@ -915,6 +1018,12 @@ dialog form {
     grid-template-columns: 1fr;
   }
 
+  /* Sauf les paires de champs courts (deux dates) : elles tiennent cote a cote. */
+  .grid.two.keep-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
   .route-actions {
     align-items: stretch;
     flex-direction: column;
@@ -924,13 +1033,47 @@ dialog form {
     width: 100%;
   }
 
+  /* Trois nombres courts : ils tiennent en rangee et se lisent d'un coup d'oeil.
+     Empiles, ils occupaient un ecran entier pour trois valeurs.
+     Le premier compte des trajets — deux chiffres suffisent ; la place gagnee
+     va aux deux autres, qui doivent encaisser un total annuel a cinq chiffres. */
   .summary-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 0.58fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .summary {
+    padding: 10px 8px;
+  }
+
+  .summary span {
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
+  /* La valeur ne doit pas se couper entre le nombre et son unite. 16px est la
+     plus grande taille qui tienne pour un total a cinq chiffres — mesure :
+     92px de texte pour 96px disponibles ; a 17px le cas kilometres deborde. */
+  .summary strong {
+    font-size: 16px;
+    margin-top: 2px;
+    white-space: nowrap;
   }
 
   .section-head {
     align-items: flex-start;
     gap: 8px;
+  }
+
+  /* Titre de rapport long (il porte le nom de la structure) face a deux
+     boutons : cote a cote ils se compriment jusqu'a casser les libelles. */
+  #reportCard .section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #reportCard .section-head .button-row {
+    justify-content: flex-start;
   }
 
   .button-row {

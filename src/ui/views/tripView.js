@@ -269,6 +269,15 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
   }
 
   /**
+   * Formulaire vierge, mais daté du jour choisi dans l'historique : saisir un
+   * trajet oublié sans avoir à retrouver la date dans le sélecteur.
+   */
+  function startForDate(dateIso) {
+    reset();
+    if (dateIso) fields.date.value = dateIso;
+  }
+
+  /**
    * Pré-remplit le formulaire depuis une trace GPS, sans l'enregistrer.
    * La distance vient de la mesure : elle ne doit pas être recalculée.
    */
@@ -464,5 +473,5 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     }, 400);
   }
 
-  return { refresh, edit, duplicate, reset, loadDraft };
+  return { refresh, edit, duplicate, reset, loadDraft, startForDate };
 }

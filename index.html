@@ -32,7 +32,7 @@
 
     <main>
       <section id="setupBanner" class="card warning screen-only hidden">
-        <strong>Configuration nécessaire</strong>
+        <h2>Configuration nécessaire</h2>
         <p>Ajoute d’abord ton ou tes véhicules et tes structures dans <b>Réglages</b>.</p>
         <button data-tab="settings">Ouvrir les réglages</button>
       </section>
@@ -42,7 +42,7 @@
         <div class="card auto-record">
           <div class="section-head">
             <div>
-              <strong>Enregistrement automatique</strong>
+              <h2>Enregistrement automatique</h2>
               <div id="autoRecordState" class="meta"></div>
             </div>
             <button id="autoRecordHelpBtn" class="ghost">Configurer</button>
@@ -133,10 +133,7 @@
       <!-- ========================== HISTORIQUE ========================== -->
       <section id="tab-history" class="tab-panel screen-only">
         <div class="card">
-          <div class="section-head">
-            <h2>Historique</h2>
-            <button id="clearTripsBtn" class="danger ghost">Tout effacer</button>
-          </div>
+          <h2>Historique</h2>
           <div class="scope-switch" role="group" aria-label="Période affichée">
             <button data-scope="day" class="scope-btn">Jour</button>
             <button data-scope="month" class="scope-btn active">Mois</button>
@@ -169,10 +166,13 @@
               >Véhicule
               <select id="reportVehicle"><option value="">Tous les véhicules</option></select>
             </label>
+          </div>
+          <!-- Deux dates courtes : elles restent cote a cote meme sur telephone. -->
+          <div class="grid two keep-two">
             <label>Du <input id="reportFrom" type="date" /></label>
             <label>Au <input id="reportTo" type="date" /></label>
           </div>
-          <div class="button-row">
+          <div class="button-row equal">
             <button id="reportPrevMonthBtn" class="ghost">Mois dernier</button>
             <button id="reportThisMonthBtn" class="ghost">Ce mois</button>
             <button id="reportThisYearBtn" class="ghost">Cette année</button>
@@ -213,7 +213,39 @@
       <!-- =========================== RÉGLAGES =========================== -->
       <section id="tab-settings" class="tab-panel screen-only">
         <div class="card">
-          <h2>Bénéficiaire des remboursements</h2>
+          <div class="section-head">
+            <h2>Structures</h2>
+            <button id="addCompanyBtn">+ Ajouter</button>
+          </div>
+          <div id="companiesList"></div>
+        </div>
+
+        <div class="card">
+          <div class="section-head">
+            <h2>Véhicules</h2>
+            <button id="addVehicleBtn">+ Ajouter</button>
+          </div>
+          <div id="vehiclesList"></div>
+        </div>
+
+        <div class="card">
+          <div class="section-head">
+            <h2>Lieux favoris</h2>
+            <button id="addPlaceBtn">+ Ajouter</button>
+          </div>
+          <p class="hint">
+            Un lieu favori est proposé en priorité, marqué ★, dès les premières lettres saisies
+            dans le départ ou la destination.
+          </p>
+          <div id="placesList"></div>
+        </div>
+
+        <!--
+          Bloc replie par defaut : le beneficiaire se saisit une fois, puis ne
+          bouge plus. Un <details> natif suffit, aucun JS a synchroniser.
+        -->
+        <details class="card collapsible">
+          <summary><h2>Bénéficiaire des remboursements</h2></summary>
           <p class="hint">
             Personne physique qui utilise son véhicule personnel et perçoit les indemnités.
             Ces informations apparaissent en haut à gauche du rapport.
@@ -241,35 +273,7 @@
             <button id="saveBeneficiaryBtn" class="primary">Enregistrer le bénéficiaire</button>
             <span id="beneficiaryStatus" class="status"></span>
           </div>
-        </div>
-
-        <div class="card">
-          <div class="section-head">
-            <h2>Structures</h2>
-            <button id="addCompanyBtn">+ Ajouter</button>
-          </div>
-          <div id="companiesList"></div>
-        </div>
-
-        <div class="card">
-          <div class="section-head">
-            <h2>Véhicules</h2>
-            <button id="addVehicleBtn">+ Ajouter</button>
-          </div>
-          <div id="vehiclesList"></div>
-        </div>
-
-        <div class="card">
-          <div class="section-head">
-            <h2>Lieux favoris</h2>
-            <button id="addPlaceBtn">+ Ajouter</button>
-          </div>
-          <p class="hint">
-            Un lieu favori est proposé en priorité, marqué ★, dès les premières lettres saisies
-            dans le départ ou la destination.
-          </p>
-          <div id="placesList"></div>
-        </div>
+        </details>
 
         <div class="card">
           <h2>Sauvegarde</h2>
@@ -326,15 +330,86 @@
       <section id="print-report" class="print-only"></section>
     </main>
 
+    <!--
+      Icones au trait, heritant de la couleur du bouton via currentColor : l'etat
+      actif du CSS colore l'icone et le libelle d'un seul coup. Purement
+      decoratives, le libelle porte deja le sens pour les lecteurs d'ecran.
+    -->
     <nav class="bottom-nav screen-only">
       <button data-tab="home" class="active">
-        <span class="nav-label">Accueil</span>
+        <svg
+          class="nav-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+          <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+        </svg>
+        <span class="nav-label">À valider</span>
         <span id="homeBadge" class="nav-badge hidden">0</span>
       </button>
-      <button data-tab="history"><span class="nav-label">Tous les trajets</span></button>
+      <button data-tab="history">
+        <svg
+          class="nav-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <path d="M12 7v5l4 2" />
+        </svg>
+        <span class="nav-label">Historique</span>
+      </button>
       <button id="addTripBtn" class="nav-add" data-tab="trip" aria-label="Ajouter un trajet">+</button>
-      <button data-tab="reports"><span class="nav-label">Rapports</span></button>
-      <button data-tab="settings"><span class="nav-label">Réglages</span></button>
+      <button data-tab="reports">
+        <svg
+          class="nav-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+          <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+          <path d="M16 13H8" />
+          <path d="M16 17H8" />
+          <path d="M10 9H8" />
+        </svg>
+        <span class="nav-label">Rapports</span>
+      </button>
+      <button data-tab="settings">
+        <svg
+          class="nav-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+        <span class="nav-label">Réglages</span>
+      </button>
     </nav>
 
     <!-- ============================ DIALOGUES ============================ -->
