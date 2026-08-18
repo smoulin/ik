@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.8.1] — 2026-08-18
+
 ### Corrigé
 - **« Annuler » n'exige plus de remplir le formulaire.** Dans les boîtes
   « Ajouter une structure », « Ajouter un véhicule » et « Ajouter un lieu
