@@ -13,9 +13,11 @@ export function createDistanceService({ geocodingService, routingProvider }) {
    * @param {{latitude:number,longitude:number}|null} [params.fromCoords]
    * @param {{latitude:number,longitude:number}|null} [params.toCoords]
    * @param {boolean} [params.roundTrip]
+   * @param {string} [params.preference]  'fastest' | 'no-highway' | 'no-toll'
    * @param {AbortSignal} [params.signal]
    * @returns {Promise<{km: number, oneWayKm: number, durationSeconds: number,
-   *                    provider: string, fromCoords: object, toCoords: object}>}
+   *                    provider: string, geometry: Array|null,
+   *                    fromCoords: object, toCoords: object}>}
    */
   async function computeTripDistance({
     from,
@@ -23,6 +25,7 @@ export function createDistanceService({ geocodingService, routingProvider }) {
     fromCoords = null,
     toCoords = null,
     roundTrip = false,
+    preference,
     signal,
   }) {
     const origin = await geocodingService.resolve(from, { coords: fromCoords, signal });
@@ -31,7 +34,7 @@ export function createDistanceService({ geocodingService, routingProvider }) {
     const route = await routingProvider.route(
       { latitude: origin.latitude, longitude: origin.longitude },
       { latitude: destination.latitude, longitude: destination.longitude },
-      { signal },
+      { signal, preference },
     );
 
     const oneWayKm = route.distanceMeters / 1000;
@@ -42,6 +45,9 @@ export function createDistanceService({ geocodingService, routingProvider }) {
       oneWayKm: Math.round(oneWayKm * 10) / 10,
       durationSeconds: route.durationSeconds * (roundTrip ? 2 : 1),
       provider: route.provider,
+      preference: route.preference ?? null,
+      // Trace de l'aller, pour l'affichage de la carte a la demande.
+      geometry: route.geometry ?? null,
       fromCoords: { latitude: origin.latitude, longitude: origin.longitude },
       toCoords: { latitude: destination.latitude, longitude: destination.longitude },
     };

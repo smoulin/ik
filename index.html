@@ -55,11 +55,23 @@
 
           <div class="route-actions">
             <button id="calcDistanceBtn" class="primary">Calculer les kilomètres</button>
+            <label class="route-pref"
+              >Itinéraire
+              <select id="routePreference">
+                <option value="fastest">Le plus rapide</option>
+                <option value="no-highway">Sans autoroute</option>
+                <option value="no-toll">Sans péage</option>
+              </select>
+            </label>
             <label class="inline-check"
               ><input id="roundTrip" type="checkbox" /> Aller-retour</label
             >
           </div>
           <div id="routeStatus" class="status" role="status"></div>
+          <div class="button-row">
+            <button id="showMapBtn" class="ghost hidden">Voir le trajet sur la carte</button>
+          </div>
+          <div id="routeMap" class="route-map hidden"></div>
 
           <div class="grid two">
             <!-- Champ texte + inputmode décimal : un type="number" refuse la

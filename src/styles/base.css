@@ -185,6 +185,35 @@ button.ghost {
   font-weight: 500;
 }
 
+/* Sélecteur d'itinéraire, à côté du bouton de calcul. */
+.route-pref {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 160px;
+}
+
+.route-pref select {
+  margin-top: 4px;
+}
+
+/* Carte : hauteur fixe, sinon Leaflet ne sait pas se dimensionner. */
+.route-map {
+  height: 320px;
+  margin: 10px 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #eef1f4;
+}
+
+/* Les tuiles doivent rester lisibles quel que soit le thème du système. */
+.route-map .leaflet-container {
+  height: 100%;
+  width: 100%;
+  font: inherit;
+  background: #eef1f4;
+}
+
 .inline-check input {
   width: auto;
   margin: 0;

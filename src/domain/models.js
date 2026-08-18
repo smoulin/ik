@@ -28,6 +28,25 @@ export const FUEL_TYPES = /** @type {const} */ ({
   LPG: 'lpg',
 });
 
+/**
+ * Provenance de la distance d'un trajet.
+ * 'gps' designe une trace reellement enregistree, la source la plus fiable.
+ */
+export const DISTANCE_SOURCES = ['manual', 'routing', 'gps'];
+
+/**
+ * Itineraire demande au calcul. Volontairement declare ici plutot qu'importe
+ * du fournisseur : le modele de donnees ne doit dependre d'aucun service.
+ */
+export const ROUTE_PREFERENCES_ALLOWED = ['fastest', 'no-highway', 'no-toll'];
+
+/** Libelles affichables, y compris dans les rapports. */
+export const ROUTE_PREFERENCE_LABELS = {
+  fastest: 'Le plus rapide',
+  'no-highway': 'Sans autoroute',
+  'no-toll': 'Sans péage',
+};
+
 /* ------------------------------------------------------------------ */
 /* Adresse                                                             */
 /* ------------------------------------------------------------------ */
@@ -222,7 +241,8 @@ export function createVehicle(input = {}) {
  * @property {number} km
  * @property {string} purpose
  * @property {boolean} roundTrip
- * @property {string} distanceSource  'manual' | 'routing'
+ * @property {string} distanceSource  'manual' | 'routing' | 'gps'
+ * @property {string} routePreference  itineraire retenu : 'fastest' | 'no-highway' | 'no-toll'
  */
 export function createTrip(input = {}) {
   return withMeta(
@@ -237,7 +257,13 @@ export function createTrip(input = {}) {
       km: num(input.km) ?? 0,
       purpose: str(input.purpose),
       roundTrip: Boolean(input.roundTrip),
-      distanceSource: input.distanceSource === 'routing' ? 'routing' : 'manual',
+      distanceSource: DISTANCE_SOURCES.includes(input.distanceSource)
+        ? input.distanceSource
+        : 'manual',
+      // Conserve pour que le rapport puisse indiquer quel itineraire a servi.
+      routePreference: ROUTE_PREFERENCES_ALLOWED.includes(input.routePreference)
+        ? input.routePreference
+        : 'fastest',
     },
     input,
     'trip',

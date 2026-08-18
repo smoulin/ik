@@ -22,6 +22,8 @@
     "fake-indexeddb": "^6.2.5",
     "vite": "^6.4.3",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4"
   }
 }
-
