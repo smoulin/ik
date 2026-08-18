@@ -83,7 +83,6 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     name: byId('companyName'),
     legalName: byId('companyLegalName'),
     type: byId('companyType'),
-    siren: byId('companySiren'),
     siret: byId('companySiret'),
     address: byId('companyAddress'),
     postalCode: byId('companyPostalCode'),
@@ -122,7 +121,6 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     companyFields.name.value = company?.name || '';
     companyFields.legalName.value = company?.legalName || '';
     companyFields.type.value = company?.type || '';
-    companyFields.siren.value = company?.siren || '';
     companyFields.siret.value = company?.siret || '';
     companyFields.address.value = company?.address?.line1 || company?.address?.label || '';
     companyFields.postalCode.value = company?.address?.postalCode || '';
@@ -166,7 +164,6 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
       name,
       legalName: companyFields.legalName.value,
       type: companyFields.type.value,
-      siren: companyFields.siren.value,
       siret: companyFields.siret.value,
       address: {
         label: composeAddressLabel({
@@ -202,7 +199,7 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
       const meta = [
         calculationModeLabel(company),
         isAddressEmpty(company.address) ? null : formatAddressOneLine(company.address),
-        company.siret ? `SIRET ${company.siret}` : company.siren ? `SIREN ${company.siren}` : null,
+        company.siret ? `SIRET ${company.siret}` : null,
       ].filter(Boolean);
 
       container.append(

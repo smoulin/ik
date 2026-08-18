@@ -55,9 +55,8 @@
 
           <div class="route-actions">
             <button id="calcDistanceBtn" class="primary">Calculer les kilomètres</button>
-            <label class="route-pref"
-              >Itinéraire
-              <select id="routePreference">
+            <label class="route-pref" aria-label="Itinéraire"
+              ><select id="routePreference">
                 <option value="fastest">Le plus rapide</option>
                 <option value="no-highway">Sans autoroute</option>
                 <option value="no-toll">Sans péage</option>
@@ -307,10 +306,10 @@
           <input id="companyLegalName" placeholder="Ex. EXEMPLE DEVELOPPEMENT SASU" />
         </label>
         <label>Type / libellé <input id="companyType" placeholder="Ex. SASU, EI LMP, personnel" /></label>
-        <div class="grid two">
-          <label>SIREN <input id="companySiren" inputmode="numeric" placeholder="123456789" /></label>
-          <label>SIRET <input id="companySiret" inputmode="numeric" placeholder="12345678900012" /></label>
-        </div>
+        <label
+          >SIRET (facultatif)
+          <input id="companySiret" inputmode="numeric" placeholder="12345678900012" />
+        </label>
         <label>Adresse <input id="companyAddress" placeholder="12 rue Exemple" /></label>
         <div class="grid two">
           <label>Code postal <input id="companyPostalCode" inputmode="numeric" /></label>
@@ -355,7 +354,7 @@
         <label
           >Carburant pour le barème BIC
           <select id="vehicleFuel">
-            <option value="petrol">Super sans plomb</option>
+            <option value="petrol">Essence sans plomb</option>
             <option value="diesel">Gazole</option>
             <option value="lpg">GPL</option>
           </select>

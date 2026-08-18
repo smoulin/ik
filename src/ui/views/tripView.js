@@ -336,19 +336,48 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     const company = store.getCompany(trip.companyId);
     const vehicle = store.getVehicle(trip.vehicleId);
 
+    // Meme presentation et memes actions que dans l'historique : le trajet qui
+    // vient d'etre saisi est justement celui qu'on veut pouvoir corriger.
     container.append(
-      el('strong', { text: `${trip.from} → ${trip.to}` }),
-      el('div', {
-        class: 'meta',
-        text: [
-          formatDateFr(trip.date),
-          company?.name || '?',
-          vehicle?.name || '?',
-          formatKm(trip.km),
-          formatMoney(computed?.amount || 0),
-        ].join(' · '),
-      }),
+      el('div', { class: 'trip-item' }, [
+        el('div', { class: 'trip-main' }, [
+          el('strong', { text: `${trip.from} → ${trip.to}` }),
+          el('div', {
+            class: 'meta',
+            text: [formatDateFr(trip.date), company?.name || '?', vehicle?.name || '?'].join(' · '),
+          }),
+          el('div', {
+            class: 'meta strong',
+            text: [
+              formatKm(trip.km),
+              formatMoney(computed?.amount || 0),
+              trip.roundTrip ? 'aller-retour' : null,
+              trip.purpose || null,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          }),
+        ]),
+        el('div', { class: 'trip-actions' }, [
+          el('button', { text: 'Modifier', onClick: () => edit(trip.id) }),
+          el('button', { text: 'Dupliquer', onClick: () => duplicate(trip.id) }),
+          el('button', {
+            class: 'danger',
+            text: 'Suppr.',
+            onClick: () => removeTrip(trip.id),
+          }),
+        ]),
+      ]),
     );
+  }
+
+  /** Suppression depuis « Dernier trajet », avec la meme confirmation qu'ailleurs. */
+  async function removeTrip(id) {
+    if (!window.confirm('Supprimer ce trajet ?')) return;
+    await store.deleteTrip(id);
+    // Si le trajet supprime etait en cours d'edition, le formulaire n'a plus d'objet.
+    if (editingId === id) reset();
+    onSaved();
   }
 
   /* ---------------------------------------------------------------- */

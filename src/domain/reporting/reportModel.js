@@ -197,9 +197,11 @@ function buildCompanyBlock(company) {
   const displayName = company.legalName || company.name;
   const addressLines = isAddressEmpty(company.address) ? [] : formatAddressLines(company.address);
 
+  // Le SIRET contient deja le SIREN (ses 9 premiers chiffres) : afficher les
+  // deux ferait doublon sur le rapport.
   const identifiers = [];
-  if (company.siren) identifiers.push(`SIREN ${formatSiren(company.siren)}`);
   if (company.siret) identifiers.push(`SIRET ${formatSiret(company.siret)}`);
+  else if (company.siren) identifiers.push(`SIREN ${formatSiren(company.siren)}`);
 
   return {
     present: true,
