@@ -172,11 +172,6 @@ export function createStore() {
     if (track) await trackRepository.save({ ...track, status: 'converted' });
   }
 
-  async function deleteAllTrips() {
-    for (const trip of state.trips) await tripRepository.remove(trip.id);
-    await load();
-  }
-
   /* -------------------------------------------------------------- */
   /* Lectures                                                        */
   /* -------------------------------------------------------------- */
@@ -199,7 +194,6 @@ export function createStore() {
     deleteVehicle,
     deleteTrip,
     deleteFavoritePlace,
-    deleteAllTrips,
     markTrackConverted,
     companyUsage,
     vehicleUsage,
