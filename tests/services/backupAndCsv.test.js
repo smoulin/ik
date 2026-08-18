@@ -234,8 +234,28 @@ describe('protection contre l’injection de formule dans le CSV', () => {
   });
 
   it('protege aussi le nom de la structure', () => {
-    const csv = buildCsv(reportWith('Client X'), { companyName: '=cmd|calc' });
-    expect(csv).toContain('"\'=cmd|calc"');
+    // Le nom vient du rapport, ligne par ligne : c'est cette source qu'il faut
+    // neutraliser, et non un libellé passé à l'export.
+    const piegee = createCompany({ id: 'c1', name: '=cmd|calc', calculationMode: 'ik2026' });
+    const rapport = buildReport({
+      trips: [
+        createTrip({
+          id: 'r9',
+          companyId: 'c1',
+          vehicleId: 'v1',
+          date: '2026-08-01',
+          from: 'A',
+          to: 'B',
+          km: 10,
+        }),
+      ],
+      companies: [piegee],
+      vehicles: [csvVehicle],
+      beneficiary: null,
+      filters: { companyId: 'c1' },
+    });
+
+    expect(buildCsv(rapport, { companyName: '=cmd|calc' })).toContain('"\'=cmd|calc"');
   });
 
   it('ne touche PAS aux colonnes numeriques et a la date', () => {

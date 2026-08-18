@@ -324,3 +324,101 @@ describe('methode de calcul et vehicules', () => {
     expect(report().generatedAtLabel).toBe('15/09/2026');
   });
 });
+
+describe('rapport de synthèse, toutes structures', () => {
+  const sasu = createCompany({ id: 'a', name: 'SASU A', calculationMode: 'ik2026' });
+  const ei = createCompany({
+    id: 'b',
+    name: 'EI LMP',
+    calculationMode: 'fixed',
+    calculationSettings: { fixedRate: 0.2 },
+  });
+  const car = createVehicle({ id: 'v1', name: 'GLC', cv: 5, fuel: 'diesel' });
+
+  const mixte = [
+    createTrip({ id: 'x1', companyId: 'a', vehicleId: 'v1', date: '2026-08-03', km: 100 }),
+    createTrip({ id: 'x2', companyId: 'b', vehicleId: 'v1', date: '2026-08-04', km: 50 }),
+    createTrip({ id: 'x3', companyId: 'a', vehicleId: 'v1', date: '2026-08-05', km: 30 }),
+  ];
+
+  const synthese = (filters = {}) =>
+    buildReport({
+      trips: mixte,
+      companies: [sasu, ei],
+      vehicles: [car],
+      beneficiary,
+      filters: { from: '2026-08-01', to: '2026-08-31', ...filters },
+    });
+
+  it('retient les trajets de toutes les structures quand aucune n’est choisie', () => {
+    const result = synthese();
+    expect(result.allCompanies).toBe(true);
+    expect(result.lines.map((l) => l.id)).toEqual(['x1', 'x2', 'x3']);
+    expect(result.totals.tripCount).toBe(3);
+    expect(result.totals.km).toBe(180);
+  });
+
+  it('porte un titre de synthèse, pas d’état de frais', () => {
+    expect(synthese().title).toBe('Synthèse des frais kilométriques');
+    // Un rapport adressé à une structure garde son titre habituel.
+    expect(synthese({ companyId: 'a' }).title).toBe(REPORT_TITLE);
+  });
+
+  it('indique la structure sur chaque ligne', () => {
+    const lignes = synthese().lines;
+    expect(lignes.map((l) => l.companyName)).toEqual(['SASU A', 'EI LMP', 'SASU A']);
+  });
+
+  it('applique à chaque trajet le barème de SA structure', () => {
+    const result = synthese();
+    const parId = Object.fromEntries(result.lines.map((l) => [l.id, l.amount]));
+
+    // SASU A au barème kilométrique 5 CV : 0,636 €/km.
+    expect(parId.x1).toBeCloseTo(63.6, 6);
+    // EI LMP au taux fixe de 0,20 €/km.
+    expect(parId.x2).toBeCloseTo(10, 6);
+  });
+
+  it('totalise par structure, du montant le plus élevé au plus faible', () => {
+    const parStructure = synthese().byCompany;
+
+    expect(parStructure).toHaveLength(2);
+    expect(parStructure[0]).toMatchObject({ name: 'SASU A', tripCount: 2, km: 130 });
+    expect(parStructure[1]).toMatchObject({ name: 'EI LMP', tripCount: 1, km: 50 });
+    // La somme des sous-totaux doit égaler le total général.
+    const somme = parStructure.reduce((s, e) => s + e.amount, 0);
+    expect(somme).toBeCloseTo(synthese().totals.amount, 2);
+  });
+
+  it('liste la méthode de calcul de chaque structure', () => {
+    const methodes = synthese().calculationsByCompany;
+    expect(methodes).toHaveLength(2);
+    expect(methodes.find((m) => m.companyName === 'EI LMP').label).toContain('0,200 €/km');
+    expect(methodes.find((m) => m.companyName === 'SASU A').label).toContain('Barème IK');
+  });
+
+  it('n’affiche pas l’avertissement de périmètre sur une synthèse', () => {
+    // Le détail par structure y figure déjà : l'avertissement ferait doublon.
+    expect(synthese().warnings).toEqual([]);
+  });
+
+  it('reste combinable avec le filtre de véhicule et la période', () => {
+    const autre = createVehicle({ id: 'v2', name: 'Zoe', cv: 4, electric: true });
+    const result = buildReport({
+      trips: mixte,
+      companies: [sasu, ei],
+      vehicles: [car, autre],
+      beneficiary,
+      filters: { vehicleId: 'v2' },
+    });
+    expect(result.lines).toHaveLength(0);
+    expect(result.byCompany).toEqual([]);
+  });
+
+  it('ne produit aucun sous-total sur un rapport mono-structure', () => {
+    const result = synthese({ companyId: 'a' });
+    expect(result.allCompanies).toBe(false);
+    expect(result.byCompany).toEqual([]);
+    expect(result.calculationsByCompany).toEqual([]);
+  });
+});

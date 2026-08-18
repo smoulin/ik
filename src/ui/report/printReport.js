@@ -39,12 +39,18 @@ function buildHeader(report) {
     ...report.beneficiary.addressLines.map((line) => el('div', { text: line })),
   ]);
 
-  const companyBlock = el('div', { class: 'print-party print-company' }, [
-    el('div', { class: 'print-party-role', text: 'Structure' }),
-    el('div', { class: 'print-party-name', text: report.company.displayName || '—' }),
-    ...report.company.addressLines.map((line) => el('div', { text: line })),
-    ...report.company.identifiers.map((line) => el('div', { class: 'print-ids', text: line })),
-  ]);
+  const companyBlock = report.allCompanies
+    ? el('div', { class: 'print-party print-company' }, [
+        el('div', { class: 'print-party-role', text: 'Structures' }),
+        el('div', { class: 'print-party-name', text: 'Toutes structures' }),
+        ...report.byCompany.map((entry) => el('div', { text: entry.name })),
+      ])
+    : el('div', { class: 'print-party print-company' }, [
+        el('div', { class: 'print-party-role', text: 'Structure' }),
+        el('div', { class: 'print-party-name', text: report.company.displayName || '—' }),
+        ...report.company.addressLines.map((line) => el('div', { text: line })),
+        ...report.company.identifiers.map((line) => el('div', { class: 'print-ids', text: line })),
+      ]);
 
   return el('header', { class: 'print-head' }, [beneficiaryBlock, companyBlock]);
 }
@@ -54,46 +60,83 @@ function buildHeader(report) {
 /* ------------------------------------------------------------------ */
 
 function buildTable(report) {
+  // Sur une synthèse, une colonne de plus : qui rembourse chaque trajet.
+  const withCompany = Boolean(report.allCompanies);
+  const columnCount = withCompany ? 8 : 7;
+
   const head = el('thead', {}, [
-    el('tr', {}, [
-      el('th', { text: 'Date' }),
-      el('th', { text: 'Départ' }),
-      el('th', { text: 'Destination' }),
-      el('th', { text: 'Motif' }),
-      el('th', { text: 'Véhicule' }),
-      el('th', { class: 'num', text: 'Km' }),
-      el('th', { class: 'num', text: 'Montant' }),
-    ]),
+    el(
+      'tr',
+      {},
+      [
+        el('th', { text: 'Date' }),
+        withCompany ? el('th', { text: 'Structure' }) : null,
+        el('th', { text: 'Départ' }),
+        el('th', { text: 'Destination' }),
+        el('th', { text: 'Motif' }),
+        el('th', { text: 'Véhicule' }),
+        el('th', { class: 'num', text: 'Km' }),
+        el('th', { class: 'num', text: 'Montant' }),
+      ].filter(Boolean),
+    ),
   ]);
 
   const rows = report.lines.length
     ? report.lines.map((line) =>
-        el('tr', {}, [
-          el('td', { text: line.dateLabel }),
-          el('td', { text: line.from }),
-          el('td', { text: line.roundTrip ? `${line.to} (aller-retour)` : line.to }),
-          el('td', { text: line.purpose }),
-          el('td', { text: line.vehicleName }),
-          el('td', { class: 'num', text: formatNumberFr(line.km, 1) }),
-          el('td', { class: 'num', text: formatMoney(line.amount) }),
-        ]),
+        el(
+          'tr',
+          {},
+          [
+            el('td', { text: line.dateLabel }),
+            withCompany ? el('td', { text: line.companyName }) : null,
+            el('td', { text: line.from }),
+            el('td', { text: line.roundTrip ? `${line.to} (aller-retour)` : line.to }),
+            el('td', { text: line.purpose }),
+            el('td', { text: line.vehicleName }),
+            el('td', { class: 'num', text: formatNumberFr(line.km, 1) }),
+            el('td', { class: 'num', text: formatMoney(line.amount) }),
+          ].filter(Boolean),
+        ),
       )
-    : [el('tr', {}, [el('td', { colspan: '7', text: 'Aucun trajet sur cette période.' })])];
+    : [
+        el('tr', {}, [
+          el('td', { colspan: String(columnCount), text: 'Aucun trajet sur cette période.' }),
+        ]),
+      ];
 
-  const foot = el('tfoot', {}, [
+  // Les deux dernières colonnes portent les totaux, le reste sert de libellé.
+  const labelSpan = String(columnCount - 2);
+
+  const footRows = [
     el('tr', {}, [
-      el('td', { colspan: '5', class: 'total-label', text: 'Total kilomètres' }),
+      el('td', { colspan: labelSpan, class: 'total-label', text: 'Total kilomètres' }),
       el('td', { class: 'num total', text: formatNumberFr(report.totals.km, 1) }),
       el('td', { class: 'num', text: '' }),
     ]),
     el('tr', {}, [
-      el('td', { colspan: '5', class: 'total-label', text: 'Total indemnités' }),
+      el('td', { colspan: labelSpan, class: 'total-label', text: 'Total indemnités' }),
       el('td', { class: 'num', text: '' }),
       el('td', { class: 'num total', text: formatMoney(report.totals.amount) }),
     ]),
-  ]);
+  ];
 
-  return el('table', { class: 'print-table' }, [head, el('tbody', {}, rows), foot]);
+  // Sur une synthèse, chaque structure rembourse sa part : le total global
+  // ne suffit pas, il faut le détail.
+  for (const entry of report.byCompany || []) {
+    footRows.push(
+      el('tr', { class: 'company-total' }, [
+        el('td', { colspan: labelSpan, class: 'total-label', text: `dont ${entry.name}` }),
+        el('td', { class: 'num', text: formatNumberFr(entry.km, 1) }),
+        el('td', { class: 'num', text: formatMoney(entry.amount) }),
+      ]),
+    );
+  }
+
+  return el('table', { class: 'print-table' }, [
+    head,
+    el('tbody', {}, rows),
+    el('tfoot', {}, footRows),
+  ]);
 }
 
 /* ------------------------------------------------------------------ */
@@ -131,9 +174,22 @@ function buildFooterInfo(report) {
     );
   }
 
-  rows.push(infoRow('Méthode de calcul', report.calculation.label));
-  if (report.calculation.scaleYear) {
-    rows.push(infoRow('Année du barème', String(report.calculation.scaleYear)));
+  if (report.allCompanies) {
+    // Chaque structure applique sa propre méthode : une ligne unique serait fausse.
+    for (const entry of report.calculationsByCompany) {
+      rows.push(infoRow(entry.companyName, entry.label));
+    }
+    rows.push(
+      infoRow(
+        'Nature du document',
+        'Synthèse toutes structures — pour une demande de remboursement, éditer un état par structure.',
+      ),
+    );
+  } else {
+    rows.push(infoRow('Méthode de calcul', report.calculation.label));
+    if (report.calculation.scaleYear) {
+      rows.push(infoRow('Année du barème', String(report.calculation.scaleYear)));
+    }
   }
 
   const info = el('section', { class: 'print-info' }, rows);
