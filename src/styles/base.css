@@ -1270,3 +1270,16 @@ dialog h2 {
   background: var(--gold-wash);
   border-color: var(--gold-soft);
 }
+
+/* Détail par structure, sur un rapport de synthèse. */
+.by-company:not(:empty) {
+  margin-bottom: 14px;
+}
+
+.by-company h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand-ink-soft);
+  margin: 0 0 9px;
+}

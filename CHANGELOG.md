@@ -8,6 +8,15 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+### Ajouté
+- **Rapport toutes structures.** Le menu des structures propose « Toutes les
+  structures », qui produit une synthèse : chaque trajet garde le barème de sa
+  propre structure, une colonne indique qui rembourse, et des sous-totaux par
+  structure figurent à l'écran comme sur le PDF.
+  Le document est explicitement présenté comme une **synthèse** et non comme un
+  état de frais : un remboursement s'adresse à une structure, et c'est elle qui
+  doit figurer en en-tête. Un avertissement le rappelle avant l'impression.
+
 ## [0.6.0] — 2026-08-18
 
 ### Ajouté

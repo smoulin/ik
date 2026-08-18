@@ -54,7 +54,9 @@ export function escapeCsvFormula(value) {
 export function buildCsv(report, { companyName = '' } = {}) {
   const rows = report.lines.map((line) => [
     line.date,
-    companyName,
+    // La structure est celle du trajet : un rapport de synthèse en contient
+    // plusieurs, et reprendre un nom global fausserait toutes les lignes.
+    line.companyName || companyName,
     line.vehicleName,
     line.from,
     line.to,

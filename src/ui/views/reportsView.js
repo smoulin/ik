@@ -44,11 +44,8 @@ export function createReportsView({ store, appVersion }) {
   }
 
   function generate() {
+    // Aucune structure choisie = rapport de synthèse, toutes structures.
     const companyId = companySelect.value;
-    if (!companyId) {
-      window.alert('Choisis une structure.');
-      return;
-    }
 
     currentReport = buildReport({
       trips: store.state.trips,
@@ -75,7 +72,9 @@ export function createReportsView({ store, appVersion }) {
   /* ---------------------------------------------------------------- */
 
   function renderScreen(report) {
-    byId('reportTitle').textContent = `${report.title} — ${report.company.name}`;
+    byId('reportTitle').textContent = report.allCompanies
+      ? report.title
+      : `${report.title} — ${report.company.name}`;
 
     renderWarnings(report);
 
@@ -84,6 +83,8 @@ export function createReportsView({ store, appVersion }) {
       summary('Total kilomètres', formatKm(report.totals.km)),
       summary('Total indemnités', formatMoney(report.totals.amount)),
     );
+
+    renderCompanyTotals(report);
 
     rowsBody.replaceChildren();
     if (!report.lines.length) {
@@ -99,7 +100,13 @@ export function createReportsView({ store, appVersion }) {
               el('div', { text: `${line.from} → ${line.to}` }),
               line.roundTrip ? el('div', { class: 'meta', text: 'aller-retour' }) : null,
             ]),
-            el('td', { text: line.purpose }),
+            el('td', {}, [
+              el('div', { text: line.purpose }),
+              // Sur une synthèse, chaque ligne doit dire qui rembourse.
+              report.allCompanies
+                ? el('div', { class: 'meta strong', text: line.companyName })
+                : null,
+            ]),
             el('td', { text: line.vehicleName }),
             el('td', { class: 'num', text: formatNumberFr(line.km, 1) }),
             el('td', { class: 'num' }, [
@@ -111,14 +118,42 @@ export function createReportsView({ store, appVersion }) {
       }
     }
 
-    const method = [
-      report.period.label,
-      `Méthode : ${report.calculation.label}`,
-      report.calculation.scaleYear ? `Barème ${report.calculation.scaleYear}` : null,
-    ]
-      .filter(Boolean)
-      .join(' · ');
+    // Sur une synthèse, chaque structure applique sa propre méthode.
+    const method = report.allCompanies
+      ? [
+          report.period.label,
+          ...report.calculationsByCompany.map((c) => `${c.companyName} : ${c.label}`),
+        ].join(' · ')
+      : [
+          report.period.label,
+          `Méthode : ${report.calculation.label}`,
+          report.calculation.scaleYear ? `Barème ${report.calculation.scaleYear}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ');
     byId('reportMethod').textContent = method;
+  }
+
+  /** Sous-totaux par structure, propres au rapport de synthèse. */
+  function renderCompanyTotals(report) {
+    const container = byId('reportByCompany');
+    container.replaceChildren();
+    if (!report.allCompanies || !report.byCompany.length) return;
+
+    container.append(el('h3', { text: 'Détail par structure' }));
+    for (const entry of report.byCompany) {
+      container.append(
+        el('div', { class: 'settings-item' }, [
+          el('div', { class: 'settings-item-main' }, [
+            el('strong', { text: entry.name }),
+            el('div', { class: 'meta', text: `${entry.tripCount} trajet(s) · ${formatKm(entry.km)}` }),
+          ]),
+          el('div', { class: 'trip-figures' }, [
+            el('div', { class: 'amount', text: formatMoney(entry.amount) }),
+          ]),
+        ]),
+      );
+    }
   }
 
   /** Signale ce qui manquera sur le PDF avant que l'utilisateur ne l'imprime. */
@@ -126,11 +161,24 @@ export function createReportsView({ store, appVersion }) {
     const container = byId('reportWarnings');
     container.replaceChildren();
 
+    // Une synthèse n'est pas un état de frais : elle n'est adressée à aucune
+    // structure et ne doit pas être remise telle quelle pour remboursement.
+    if (report.allCompanies) {
+      container.append(
+        el('p', {
+          class: 'status warn',
+          text:
+            '⚠ Document de synthèse, toutes structures confondues. Pour une demande de ' +
+            'remboursement, génère un état par structure : c’est elle qui rembourse.',
+        }),
+      );
+    }
+
     const missing = [];
     if (!report.beneficiary.present) {
       missing.push('le bénéficiaire (Réglages → Bénéficiaire des remboursements)');
     }
-    if (!report.company.addressLines.length) {
+    if (!report.allCompanies && !report.company.addressLines.length) {
       missing.push('l’adresse de la structure (Réglages → Structures)');
     }
 
@@ -172,7 +220,10 @@ export function createReportsView({ store, appVersion }) {
   }
 
   function refresh() {
-    fillSelect(companySelect, store.state.companies, { labelOf: (company) => company.name });
+    fillSelect(companySelect, store.state.companies, {
+      labelOf: (company) => company.name,
+      leading: { value: '', label: 'Toutes les structures' },
+    });
     fillSelect(vehicleSelect, store.state.vehicles, {
       labelOf: (vehicle) => vehicle.name,
       leading: { value: '', label: 'Tous les véhicules' },

@@ -26,13 +26,17 @@ import { formatDateFr, formatMonthFr, lastDayOfMonth } from '../../shared/format
 
 export const REPORT_TITLE = 'État des frais kilométriques';
 
+/** Titre d'un rapport portant sur plusieurs structures : c'est une synthese. */
+export const SUMMARY_TITLE = 'Synthèse des frais kilométriques';
+
 /**
  * @param {object} params
  * @param {Array}  params.trips        tous les trajets connus (le cumul annuel en depend)
  * @param {Array}  params.companies
  * @param {Array}  params.vehicles
  * @param {object|null} params.beneficiary
- * @param {{companyId: string, vehicleId?: string, from?: string, to?: string}} params.filters
+ * @param {{companyId?: string, vehicleId?: string, from?: string, to?: string}} params.filters
+ *        `companyId` vide : toutes les structures, en synthese
  * @param {string} [params.appVersion]
  * @param {Date}   [params.generatedAt]
  */
@@ -45,10 +49,15 @@ export function buildReport({
   appVersion = '',
   generatedAt = new Date(),
 }) {
-  const { companyId, vehicleId = '', from = '', to = '' } = filters;
+  const { companyId = '', vehicleId = '', from = '', to = '' } = filters;
 
-  const company = companies.find((c) => c.id === companyId) || null;
+  // Sans structure choisie, le rapport porte sur toutes : c'est une synthese,
+  // et non un etat de frais adresse a une structure qui rembourse.
+  const allCompanies = !companyId;
+  const company = allCompanies ? null : companies.find((c) => c.id === companyId) || null;
+
   const vehicleById = new Map(vehicles.map((v) => [v.id, v]));
+  const companyById = new Map(companies.map((c) => [c.id, c]));
 
   // Le cumul annuel s'apprecie sur l'ensemble des trajets, pas seulement sur la
   // periode filtree : on calcule donc tout, puis on filtre.
@@ -56,7 +65,7 @@ export function buildReport({
 
   const selected = trips
     .filter((trip) => !trip.deletedAt)
-    .filter((trip) => trip.companyId === companyId)
+    .filter((trip) => allCompanies || trip.companyId === companyId)
     .filter((trip) => !vehicleId || trip.vehicleId === vehicleId)
     .filter((trip) => !from || trip.date >= from)
     .filter((trip) => !to || trip.date <= to)
@@ -75,6 +84,10 @@ export function buildReport({
       roundTrip: Boolean(trip.roundTrip),
       vehicleId: trip.vehicleId,
       vehicleName: vehicle?.name || '',
+      // Portee par la ligne : un rapport multi-structures doit indiquer,
+      // trajet par trajet, qui rembourse.
+      companyId: trip.companyId,
+      companyName: companyById.get(trip.companyId)?.name || '',
       km: Number(trip.km) || 0,
       amount: Number(computed?.amount) || 0,
       rateInfo: computed?.rateInfo || '',
@@ -94,15 +107,21 @@ export function buildReport({
   };
 
   return {
-    title: REPORT_TITLE,
+    title: allCompanies ? SUMMARY_TITLE : REPORT_TITLE,
     period: buildPeriod(from, to),
     beneficiary: buildBeneficiaryBlock(beneficiary),
     company: buildCompanyBlock(company),
     vehicles: buildVehiclesBlock(lines, vehicleById),
     calculation: buildCalculationBlock(company, lines, vehicleById),
+    calculationsByCompany: allCompanies
+      ? buildCalculationsByCompany(lines, companyById, vehicleById)
+      : [],
     lines,
     totals,
-    warnings: buildWarnings({ company, companies, trips, lines }),
+    // Rapport de synthese : plusieurs structures, donc plusieurs payeurs.
+    allCompanies,
+    byCompany: allCompanies ? buildCompanyTotals(lines, companyById) : [],
+    warnings: buildWarnings({ company, companies, trips, lines, allCompanies }),
     generatedAt: generatedAt.toISOString(),
     generatedAtLabel: formatDateFr(toIsoDate(generatedAt)),
     appVersion,
@@ -126,8 +145,12 @@ export function buildReport({
  * On n'impose rien — c'est un choix assume — mais l'utilisateur doit le savoir
  * au moment ou le cas se produit reellement, et pas six mois plus tard.
  */
-export function buildWarnings({ company, companies = [], trips = [], lines = [] }) {
+export function buildWarnings({ company, companies = [], trips = [], lines = [], allCompanies = false }) {
   const warnings = [];
+
+  // Une synthese multi-structures montre deja le detail par structure :
+  // l avertissement de perimetre n y aurait pas de sens.
+  if (allCompanies) return warnings;
 
   if (company?.calculationMode !== CALCULATION_MODES.IK) return warnings;
   if (IK_ACCUMULATION_SCOPE !== 'company-vehicle-year') return warnings;
@@ -189,6 +212,35 @@ function buildBeneficiaryBlock(beneficiary) {
   };
 }
 
+/**
+ * Sous-totaux par structure, pour un rapport de synthese.
+ * Chaque structure applique son propre barème : le total global ne suffit pas,
+ * il faut savoir ce que chacune doit rembourser.
+ */
+function buildCompanyTotals(lines, companyById) {
+  const totals = new Map();
+
+  for (const line of lines) {
+    if (!totals.has(line.companyId)) {
+      totals.set(line.companyId, {
+        companyId: line.companyId,
+        name: companyById.get(line.companyId)?.name || 'Structure supprimée',
+        tripCount: 0,
+        km: 0,
+        amount: 0,
+      });
+    }
+    const entry = totals.get(line.companyId);
+    entry.tripCount += 1;
+    entry.km += line.km;
+    entry.amount += line.amount;
+  }
+
+  return [...totals.values()]
+    .map((entry) => ({ ...entry, km: round(entry.km, 1), amount: round(entry.amount, 2) }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
 /** Bloc haut-droit du rapport : structure qui rembourse (cf. §6). */
 function buildCompanyBlock(company) {
   if (!company) {
@@ -247,6 +299,32 @@ function buildCalculationBlock(company, lines, vehicleById) {
     label: calculationModeLabel(company, singleVehicle),
     scaleYear: scaleYearForCompany(company),
   };
+}
+
+/**
+ * Methodes de calcul reellement utilisees dans un rapport de synthese.
+ * Chaque structure applique la sienne : une seule ligne « methode » serait faux.
+ */
+function buildCalculationsByCompany(lines, companyById, vehicleById) {
+  const seen = new Map();
+
+  for (const line of lines) {
+    if (seen.has(line.companyId)) continue;
+    const company = companyById.get(line.companyId);
+    const vehicles = [
+      ...new Set(lines.filter((l) => l.companyId === line.companyId).map((l) => l.vehicleId)),
+    ];
+    const singleVehicle = vehicles.length === 1 ? vehicleById.get(vehicles[0]) : null;
+
+    seen.set(line.companyId, {
+      companyId: line.companyId,
+      companyName: company?.name || 'Structure supprimée',
+      label: calculationModeLabel(company, singleVehicle),
+      scaleYear: scaleYearForCompany(company),
+    });
+  }
+
+  return [...seen.values()];
 }
 
 /* ------------------------------------------------------------------ */

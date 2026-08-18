@@ -143,6 +143,14 @@
     text-align: right;
   }
 
+  /* Sous-total d une structure sur un rapport de synthese. */
+  .print-table .company-total td {
+    font-weight: 400;
+    font-size: 8.5pt;
+    background: #fafafa;
+    border-top: 0;
+  }
+
   .print-table .total {
     font-size: 10pt;
   }
