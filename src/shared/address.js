@@ -49,12 +49,18 @@ export function completeSuggestionLocality(suggestion) {
   const parsed = splitFrenchAddress(source);
   if (!parsed.postalCode) return suggestion;
 
+  const postalCode = suggestion.postalCode || parsed.postalCode;
+  const city = suggestion.city || parsed.city;
+
   return {
     ...suggestion,
-    postalCode: suggestion.postalCode || parsed.postalCode,
-    city: suggestion.city || parsed.city,
+    postalCode,
+    city,
     // `label` sert a remplir le champ « adresse » : il ne doit pas repeter
     // le code postal et la ville, qui ont leurs propres champs.
     label: parsed.line1 || suggestion.label,
+    // La ligne secondaire doit rester renseignee : sans elle, la suggestion
+    // parait tronquee et l'utilisateur hesite a la choisir.
+    secondary: suggestion.secondary || [postalCode, city].filter(Boolean).join(' '),
   };
 }

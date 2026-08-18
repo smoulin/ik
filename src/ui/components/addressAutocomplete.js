@@ -81,9 +81,13 @@ export function attachAddressAutocomplete(input, { service, onSelect = () => {},
           el('span', { class: 'autocomplete-icon', text: SOURCE_ICONS[suggestion.source] || '' }),
           el('span', { class: 'autocomplete-texts' }, [
             el('span', { class: 'autocomplete-primary', text: primaryLabel(suggestion) }),
-            suggestion.secondary
-              ? el('span', { class: 'autocomplete-secondary', text: suggestion.secondary })
-              : null,
+            // Adresse exacte qui sera inseree dans le champ. Affichee en clair
+            // pour un favori : son nom seul laissait douter de ce qui allait
+            // reellement etre repris.
+            el('span', {
+              class: `autocomplete-secondary${suggestion.source === 'favorite' ? ' is-address' : ''}`,
+              text: detailLabel(suggestion),
+            }),
           ]),
         ],
       );
@@ -103,6 +107,17 @@ export function attachAddressAutocomplete(input, { service, onSelect = () => {},
   function primaryLabel(suggestion) {
     // Un favori s'affiche sous son nom (« Domicile »), pas sous son adresse.
     return suggestion.source === 'favorite' ? suggestion.name || suggestion.label : suggestion.label;
+  }
+
+  /**
+   * Deuxieme ligne : toujours l'adresse complete telle qu'elle sera reprise.
+   * Pour un favori, c'est ce qui leve le doute sur le contenu du champ.
+   */
+  function detailLabel(suggestion) {
+    if (suggestion.source === 'favorite') {
+      return suggestion.fullLabel || suggestion.secondary || '';
+    }
+    return suggestion.secondary || '';
   }
 
   function openPanel() {

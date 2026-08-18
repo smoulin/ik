@@ -386,6 +386,17 @@ button.ghost {
   font-size: 12px;
   color: var(--muted);
   margin-top: 2px;
+  /* Une adresse longue doit passer à la ligne, jamais être coupée : tronquée,
+     elle laisse craindre que la saisie soit incomplète. */
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+/* Adresse complète d'un lieu favori : c'est elle qui sera reprise dans le
+   champ, elle doit donc être parfaitement lisible. */
+.autocomplete-secondary.is-address {
+  font-size: 13px;
+  color: #92400e;
 }
 
 /* Un favori doit se distinguer immediatement d'une proposition en ligne. */

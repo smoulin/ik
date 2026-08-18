@@ -45,6 +45,15 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
   let lastGeometry = null;
   const routeMap = createRouteMap(mapContainer);
 
+  /**
+   * Distance aller du dernier calcul reseau. Elle permet de basculer
+   * aller simple / aller-retour instantanement, sans rappeler le fournisseur.
+   */
+  let lastOneWayKm = null;
+
+  /** Anti-rebond du recalcul automatique : le serveur accepte 1 requete/seconde. */
+  let recalcTimer = null;
+
   const fromAutocomplete = attachAddressAutocomplete(fields.from, {
     service: geo.addressSearchService,
     onSelect: (suggestion) => {
@@ -148,6 +157,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
       toCoords = result.toCoords;
       fields.km.value = formatDecimalInput(result.km, 1);
 
+      lastOneWayKm = result.oneWayKm;
       lastGeometry = result.geometry;
       setHidden(mapBtn, !lastGeometry);
       hideMap();
@@ -159,6 +169,9 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
       showStatus(`${sens} · ${itineraire} : ${formatKm(result.km)}`, 'good');
     } catch (error) {
       lastGeometry = null;
+      // La distance aller n'est plus fiable : on ne doit plus proposer de
+      // basculer en aller-retour a partir d'une valeur perimee.
+      lastOneWayKm = null;
       setHidden(mapBtn, true);
       showStatus(`${error.message} Tu peux saisir les kilomètres manuellement.`, 'bad');
     } finally {
@@ -239,6 +252,11 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     fields.date.value = todayIso();
     fields.routePreference.value = 'fastest';
     lastGeometry = null;
+    lastOneWayKm = null;
+    if (recalcTimer !== null) {
+      clearTimeout(recalcTimer);
+      recalcTimer = null;
+    }
     setHidden(mapBtn, true);
     hideMap();
     saveBtn.textContent = 'Enregistrer le trajet';
@@ -387,18 +405,39 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
   cancelBtn.addEventListener('click', reset);
   mapBtn.addEventListener('click', toggleMap);
 
+  // Aller-retour : la distance aller est deja connue, un simple facteur suffit.
+  // Aucun appel reseau, donc reponse immediate.
   fields.roundTrip.addEventListener('change', () => {
-    // La distance affichee ne correspond plus au sens choisi : on invite a recalculer.
-    if (fields.km.value) showStatus('Le sens a changé : relance le calcul si besoin.', '');
+    if (lastOneWayKm === null) return;
+    const km = fields.roundTrip.checked ? lastOneWayKm * 2 : lastOneWayKm;
+    fields.km.value = formatDecimalInput(Math.round(km * 10) / 10, 1);
+    const sens = fields.roundTrip.checked ? 'Aller-retour' : 'Aller simple';
+    showStatus(`${sens} · ${itineraryLabel(fields.routePreference.value)} : ${formatKm(km)}`, 'good');
   });
 
+  // Changement d'itineraire : la distance doit etre recalculee cote serveur.
+  // On le declenche automatiquement, avec un delai qui evite d'enchainer les
+  // requetes si l'utilisateur parcourt la liste (le serveur accepte 1 req/s).
   fields.routePreference.addEventListener('change', () => {
-    // Le trace affiche ne correspond plus a l'itineraire demande.
     lastGeometry = null;
     setHidden(mapBtn, true);
     hideMap();
-    if (fields.km.value) showStatus('Itinéraire modifié : relance le calcul.', '');
+    scheduleRecalculation();
   });
+
+  function scheduleRecalculation() {
+    if (recalcTimer !== null) clearTimeout(recalcTimer);
+
+    // Rien à recalculer tant qu'aucun trajet n'a été résolu.
+    if (!fields.from.value.trim() || !fields.to.value.trim()) return;
+    if (lastOneWayKm === null) return;
+
+    showStatus('Nouvel itinéraire : calcul en cours…');
+    recalcTimer = setTimeout(() => {
+      recalcTimer = null;
+      calculateDistance();
+    }, 400);
+  }
 
   return { refresh, edit, duplicate, reset };
 }
