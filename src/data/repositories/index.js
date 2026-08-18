@@ -12,6 +12,7 @@ import {
   createTrip,
   createFavoritePlace,
   createBeneficiary,
+  createTrack,
 } from '../../domain/models.js';
 
 export const companyRepository = createRepository(STORES.COMPANIES, createCompany);
@@ -19,6 +20,9 @@ export const vehicleRepository = createRepository(STORES.VEHICLES, createVehicle
 export const tripRepository = createRepository(STORES.TRIPS, createTrip);
 export const favoritePlaceRepository = createRepository(STORES.FAVORITE_PLACES, createFavoritePlace);
 export const beneficiaryRepository = createRepository(STORES.BENEFICIARIES, createBeneficiary);
+
+/** Traces GPS importees, en attente de validation ou deja converties. */
+export const trackRepository = createRepository(STORES.TRACKS, createTrack);
 
 export { settingsRepository } from './settingsRepository.js';
 export { recentAddressRepository } from './recentAddressRepository.js';

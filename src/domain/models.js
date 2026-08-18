@@ -306,6 +306,69 @@ export function createFavoritePlace(input = {}) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Trace GPS                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Etats d'une trace importee. */
+export const TRACK_STATUSES = ['pending', 'converted', 'ignored'];
+
+/**
+ * Trajet enregistre par le GPS, avant d'etre transforme en trajet declarable.
+ *
+ * Une trace est une donnee brute : elle porte la distance mesuree et le trace,
+ * mais ni structure ni motif. C'est l'utilisateur qui la valide, et c'est a ce
+ * moment qu'elle devient un trajet (`tripId` renseigne, statut « converted »).
+ *
+ * @typedef {object} Track
+ * @property {string} id
+ * @property {string} source        'gpx' pour l'instant
+ * @property {string} fileName
+ * @property {string} startedAt     ISO
+ * @property {string} endedAt       ISO
+ * @property {number} distanceMeters   distance retenue, apres filtrage
+ * @property {number} rawDistanceMeters distance brute, avant filtrage
+ * @property {object} quality       compteurs de points retenus et ecartes
+ * @property {{latitude:number,longitude:number,label:string,placeId:string|null}} start
+ * @property {{latitude:number,longitude:number,label:string,placeId:string|null}} end
+ * @property {Array<[number,number]>} geometry
+ * @property {string} status        'pending' | 'converted' | 'ignored'
+ * @property {string|null} tripId   trajet cree a partir de cette trace
+ */
+export function createTrack(input = {}) {
+  return withMeta(
+    {
+      source: str(input.source) || 'gpx',
+      fileName: str(input.fileName),
+      startedAt: str(input.startedAt),
+      endedAt: str(input.endedAt),
+      distanceMeters: num(input.distanceMeters) ?? 0,
+      rawDistanceMeters: num(input.rawDistanceMeters) ?? 0,
+      quality: input.quality ?? null,
+      start: trackEndpoint(input.start),
+      end: trackEndpoint(input.end),
+      geometry: Array.isArray(input.geometry) ? input.geometry : [],
+      status: TRACK_STATUSES.includes(input.status) ? input.status : 'pending',
+      tripId: input.tripId ? str(input.tripId) : null,
+    },
+    input,
+    'track',
+  );
+}
+
+function trackEndpoint(value) {
+  if (!value) return null;
+  const latitude = num(value.latitude);
+  const longitude = num(value.longitude);
+  if (latitude === null || longitude === null) return null;
+  return {
+    latitude,
+    longitude,
+    label: str(value.label),
+    placeId: value.placeId ? str(value.placeId) : null,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Beneficiaire                                                        */
 /* ------------------------------------------------------------------ */
 
