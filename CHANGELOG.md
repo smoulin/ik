@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.4.0] — 2026-08-18
+
 ### Ajouté
 - **Barème personnalisé par tranches.** Une structure peut désormais utiliser son
   propre barème : autant de tranches que nécessaire, chacune avec un taux au
