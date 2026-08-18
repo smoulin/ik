@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.3.0] — 2026-08-18
+
 ### Ajouté
 - **Choix de l'itinéraire** au calcul de la distance : « le plus rapide »,
   « sans autoroute » ou « sans péage ». L'itinéraire retenu est enregistré avec

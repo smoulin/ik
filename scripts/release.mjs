@@ -29,12 +29,24 @@ if (!['patch', 'minor', 'major'].includes(bump)) {
   fail('Usage : npm run release:patch | release:minor | release:major');
 }
 
+/**
+ * Execute une commande sans passer par un shell.
+ *
+ * `shell: true` serait fatal ici : sous Windows, les arguments sont alors
+ * reassembles en une seule ligne de commande, et un message de commit contenant
+ * des espaces se retrouve decoupe en plusieurs arguments — git interprete alors
+ * la fin du message comme un nom de fichier et echoue.
+ *
+ * Seul npm a besoin d'un traitement particulier : c'est un script `.cmd` sous
+ * Windows, que execFile ne sait pas lancer sous son nom court.
+ */
 function run(command, args, { capture = false } = {}) {
-  return execFileSync(command, args, {
+  const binary = command === 'npm' && process.platform === 'win32' ? 'npm.cmd' : command;
+
+  return execFileSync(binary, args, {
     cwd: rootDir,
     stdio: capture ? ['ignore', 'pipe', 'inherit'] : 'inherit',
     encoding: 'utf8',
-    shell: process.platform === 'win32',
   });
 }
 
