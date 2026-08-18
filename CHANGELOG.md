@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.7.0] — 2026-08-18
+
 ### Ajouté
 - **Rapport toutes structures.** Le menu des structures propose « Toutes les
   structures », qui produit une synthèse : chaque trajet garde le barème de sa

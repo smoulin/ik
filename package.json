@@ -1,7 +1,7 @@
 {
   "name": "agilmea-ik",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "description": "Agilmea IK â€” suivi des frais kilometriques multi-structures (PWA locale, sans backend).",
   "scripts": {
