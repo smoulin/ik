@@ -8,6 +8,38 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.8.0] — 2026-08-18
+
+### Modifié
+- **Onglets renommés d'après l'écran qu'ils ouvrent.** « Accueil » désignait une
+  position et non la tâche : cet écran est la file des trajets GPS à valider, il
+  s'appelle donc « À valider ». « Tous les trajets » devient « Historique », qui
+  tient sur une seule ligne comme ses voisins.
+- **Historique allégé** : les trois totaux tiennent sur une seule ligne, le motif
+  du trajet est visible sans déplier, et un bouton « + » par journée ouvre le
+  formulaire déjà daté — pratique pour saisir un trajet oublié sans avoir à
+  rechercher la date.
+- Le lien « Aujourd'hui » ne s'affiche que lorsqu'il change réellement la
+  période : sur la période courante, cliquer ne produisait aucun effet et le
+  faisait passer pour cassé.
+- **Bénéficiaire replié et déplacé** après les lieux favoris dans les réglages :
+  il se renseigne une fois et ne se touche plus.
+- Rapports : les deux dates restent côte à côte, les boutons de période sur une
+  seule ligne, et l'en-tête du rapport s'empile sur téléphone, où le nom de la
+  structure écrasait le titre.
+- Titres de cartes uniformisés — ils mélangeaient deux styles — et espacement
+  des champs harmonisé.
+
+### Supprimé
+- Le bouton « Tout effacer » de l'historique, et avec lui `deleteAllTrips`. Une
+  suppression massive de tous les trajets n'a pas sa place à portée de pouce ;
+  la restauration d'une sauvegarde couvre déjà ce besoin.
+
+### Corrigé
+- **Les cartes passaient par-dessus la barre de navigation** au défilement : les
+  couches Leaflet se placent au niveau 400 et le conteneur ne créait aucun
+  contexte d'empilement, si bien qu'elles rivalisaient directement avec la barre.
+
 ## [0.7.0] — 2026-08-18
 
 ### Ajouté
