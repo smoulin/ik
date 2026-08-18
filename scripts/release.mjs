@@ -41,12 +41,17 @@ if (!['patch', 'minor', 'major'].includes(bump)) {
  * Windows, que execFile ne sait pas lancer sous son nom court.
  */
 function run(command, args, { capture = false } = {}) {
-  const binary = command === 'npm' && process.platform === 'win32' ? 'npm.cmd' : command;
+  // npm est un script .cmd sous Windows. Depuis Node 20.12, execFile refuse de
+  // lancer un .cmd sans shell (correctif de securite) : npm exige donc un shell,
+  // et ses arguments ('test', 'run', 'build') ne contiennent aucun espace.
+  const needsShell = command === 'npm' && process.platform === 'win32';
+  const binary = needsShell ? 'npm.cmd' : command;
 
   return execFileSync(binary, args, {
     cwd: rootDir,
     stdio: capture ? ['ignore', 'pipe', 'inherit'] : 'inherit',
     encoding: 'utf8',
+    shell: needsShell,
   });
 }
 
