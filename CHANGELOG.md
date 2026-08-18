@@ -25,7 +25,7 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
   porte la structure et les actions, l'or ne sert que d'accent — un liseré, un
   état actif — jamais un aplat. Titres en capitales espacées, à l'image du
   mot-symbole. Icônes de l'application régénérées aux couleurs de la marque,
-  par un script versionné ().
+  par un script versionné (`npm run icons`).
 - **Sélection de la période par jour, mois ou année** dans « Tous les trajets »,
   le mois restant la vue par défaut. Un bouton « Aujourd'hui » ramène à la
   période courante.
