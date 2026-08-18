@@ -29,12 +29,29 @@ if (!['patch', 'minor', 'major'].includes(bump)) {
   fail('Usage : npm run release:patch | release:minor | release:major');
 }
 
+/**
+ * Execute une commande sans passer par un shell.
+ *
+ * `shell: true` serait fatal ici : sous Windows, les arguments sont alors
+ * reassembles en une seule ligne de commande, et un message de commit contenant
+ * des espaces se retrouve decoupe en plusieurs arguments — git interprete alors
+ * la fin du message comme un nom de fichier et echoue.
+ *
+ * Seul npm a besoin d'un traitement particulier : c'est un script `.cmd` sous
+ * Windows, que execFile ne sait pas lancer sous son nom court.
+ */
 function run(command, args, { capture = false } = {}) {
-  return execFileSync(command, args, {
+  // npm est un script .cmd sous Windows. Depuis Node 20.12, execFile refuse de
+  // lancer un .cmd sans shell (correctif de securite) : npm exige donc un shell,
+  // et ses arguments ('test', 'run', 'build') ne contiennent aucun espace.
+  const needsShell = command === 'npm' && process.platform === 'win32';
+  const binary = needsShell ? 'npm.cmd' : command;
+
+  return execFileSync(binary, args, {
     cwd: rootDir,
     stdio: capture ? ['ignore', 'pipe', 'inherit'] : 'inherit',
     encoding: 'utf8',
-    shell: process.platform === 'win32',
+    shell: needsShell,
   });
 }
 
@@ -67,8 +84,10 @@ if (branch === PRODUCTION_BRANCH) {
 console.log('\n[release] Tests…');
 run('npm', ['test']);
 
-console.log('\n[release] Build…');
-run('npm', ['run', 'build']);
+// Le build vient APRES la mise a jour de la version, plus bas : la version est
+// injectee dans le bundle au moment du build. Construire avant produirait un
+// dist/ portant l'ancien numero, et `npm run preview` afficherait une version
+// differente de celle qui vient d'etre taguee.
 
 /* ------------------------------------------------------------------ */
 /* 3. Nouvelle version                                                 */
@@ -110,7 +129,14 @@ console.log(
 );
 
 /* ------------------------------------------------------------------ */
-/* 5. Commit et tag                                                    */
+/* 5. Build, avec le numero de version definitif                       */
+/* ------------------------------------------------------------------ */
+
+console.log('\n[release] Build…');
+run('npm', ['run', 'build']);
+
+/* ------------------------------------------------------------------ */
+/* 6. Commit et tag                                                    */
 /* ------------------------------------------------------------------ */
 
 run('git', ['add', 'package.json', 'package-lock.json', 'CHANGELOG.md']);

@@ -1,7 +1,7 @@
 {
   "name": "agilmea-ik",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.6.0",
   "type": "module",
   "description": "Agilmea IK â€” suivi des frais kilometriques multi-structures (PWA locale, sans backend).",
   "scripts": {
@@ -13,7 +13,8 @@
     "check": "npm run test && npm run build",
     "release:patch": "node scripts/release.mjs patch",
     "release:minor": "node scripts/release.mjs minor",
-    "release:major": "node scripts/release.mjs major"
+    "release:major": "node scripts/release.mjs major",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -22,6 +23,8 @@
     "fake-indexeddb": "^6.2.5",
     "vite": "^6.4.3",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4"
   }
 }
-

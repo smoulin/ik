@@ -7,7 +7,13 @@
  */
 
 export const DB_NAME = 'agilmea-ik';
-export const DB_VERSION = 1;
+
+/**
+ * Version du schema IndexedDB.
+ * 1 : schema initial.
+ * 2 : ajout du magasin `tracks` (traces GPS importees).
+ */
+export const DB_VERSION = 2;
 
 export const STORES = /** @type {const} */ ({
   COMPANIES: 'companies',
@@ -18,6 +24,7 @@ export const STORES = /** @type {const} */ ({
   RECENT_ADDRESSES: 'recentAddresses',
   GEO_CACHE: 'geoCache',
   SETTINGS: 'settings',
+  TRACKS: 'tracks',
 });
 
 let dbPromise = null;
@@ -53,6 +60,15 @@ export function openDb() {
         db.createObjectStore(STORES.RECENT_ADDRESSES, { keyPath: 'key' });
         db.createObjectStore(STORES.GEO_CACHE, { keyPath: 'key' });
         db.createObjectStore(STORES.SETTINGS, { keyPath: 'key' });
+      }
+
+      // Version 2 : traces GPS importees. On se contente d'AJOUTER un magasin,
+      // sans toucher aux donnees existantes — une base v1 deja remplie est donc
+      // migree sans aucune perte.
+      if (from < 2) {
+        const tracks = createStore(db, STORES.TRACKS);
+        tracks.createIndex('byStartedAt', 'startedAt');
+        tracks.createIndex('byStatus', 'status');
       }
     };
 

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <meta name="theme-color" content="#111827" />
+    <meta name="theme-color" content="#1b2a4a" />
     <meta
       name="description"
       content="Agilmea IK — suivi des frais kilométriques multi-structures avec calcul automatique de distance routière."
@@ -20,9 +20,12 @@
     </div>
 
     <header class="app-header screen-only">
-      <div>
-        <h1>Agilmea IK</h1>
-        <p>Trajets, kilomètres automatiques et rapports séparés</p>
+      <div class="brand">
+        <span id="brandLogo" aria-hidden="true"></span>
+        <div>
+          <h1>Agilmea IK</h1>
+          <p>Frais kilométriques</p>
+        </div>
       </div>
       <button id="installBtn" class="ghost hidden">Installer</button>
     </header>
@@ -34,8 +37,32 @@
         <button data-tab="settings">Ouvrir les réglages</button>
       </section>
 
+      <!-- ============================ ACCUEIL ============================ -->
+      <section id="tab-home" class="tab-panel active screen-only">
+        <div class="card auto-record">
+          <div class="section-head">
+            <div>
+              <strong>Enregistrement automatique</strong>
+              <div id="autoRecordState" class="meta"></div>
+            </div>
+            <button id="autoRecordHelpBtn" class="ghost">Configurer</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-head">
+            <h2>Trajets à valider</h2>
+            <label class="file-button"
+              >Importer un GPX<input id="importTrackInput" type="file" accept=".gpx,application/gpx+xml" />
+            </label>
+          </div>
+          <div id="trackStatus" class="status"></div>
+          <div id="tracksList" class="trip-list"></div>
+        </div>
+      </section>
+
       <!-- ============================ TRAJET ============================ -->
-      <section id="tab-trip" class="tab-panel active screen-only">
+      <section id="tab-trip" class="tab-panel screen-only">
         <div class="card">
           <h2>Nouveau trajet</h2>
           <div class="grid two">
@@ -55,11 +82,22 @@
 
           <div class="route-actions">
             <button id="calcDistanceBtn" class="primary">Calculer les kilomètres</button>
+            <label class="route-pref" aria-label="Itinéraire"
+              ><select id="routePreference">
+                <option value="fastest">Le plus rapide</option>
+                <option value="no-highway">Sans autoroute</option>
+                <option value="no-toll">Sans péage</option>
+              </select>
+            </label>
             <label class="inline-check"
               ><input id="roundTrip" type="checkbox" /> Aller-retour</label
             >
           </div>
           <div id="routeStatus" class="status" role="status"></div>
+          <div class="button-row">
+            <button id="showMapBtn" class="ghost hidden">Voir le trajet sur la carte</button>
+          </div>
+          <div id="routeMap" class="route-map hidden"></div>
 
           <div class="grid two">
             <!-- Champ texte + inputmode décimal : un type="number" refuse la
@@ -99,13 +137,23 @@
             <h2>Historique</h2>
             <button id="clearTripsBtn" class="danger ghost">Tout effacer</button>
           </div>
-          <div class="grid two">
-            <label
-              >Filtrer par structure
-              <select id="historyCompany"><option value="">Toutes</option></select>
-            </label>
-            <label>Année <select id="historyYear"></select></label>
+          <div class="scope-switch" role="group" aria-label="Période affichée">
+            <button data-scope="day" class="scope-btn">Jour</button>
+            <button data-scope="month" class="scope-btn active">Mois</button>
+            <button data-scope="year" class="scope-btn">Année</button>
           </div>
+          <div class="month-nav">
+            <button id="prevPeriodBtn" class="ghost" aria-label="Période précédente">‹</button>
+            <div class="month-current">
+              <strong id="monthLabel">—</strong>
+              <button id="todayBtn" class="link-btn">Aujourd’hui</button>
+            </div>
+            <button id="nextPeriodBtn" class="ghost" aria-label="Période suivante">›</button>
+          </div>
+          <label class="history-filter"
+            >Structure
+            <select id="historyCompany"><option value="">Toutes</option></select>
+          </label>
           <div id="historyTotals" class="summary-grid"></div>
           <div id="historyList" class="trip-list"></div>
         </div>
@@ -278,10 +326,14 @@
     </main>
 
     <nav class="bottom-nav screen-only">
-      <button data-tab="trip" class="active">Trajet</button>
-      <button data-tab="history">Historique</button>
-      <button data-tab="reports">Rapports</button>
-      <button data-tab="settings">Réglages</button>
+      <button data-tab="home" class="active">
+        <span class="nav-label">Accueil</span>
+        <span id="homeBadge" class="nav-badge hidden">0</span>
+      </button>
+      <button data-tab="history"><span class="nav-label">Tous les trajets</span></button>
+      <button id="addTripBtn" class="nav-add" data-tab="trip" aria-label="Ajouter un trajet">+</button>
+      <button data-tab="reports"><span class="nav-label">Rapports</span></button>
+      <button data-tab="settings"><span class="nav-label">Réglages</span></button>
     </nav>
 
     <!-- ============================ DIALOGUES ============================ -->
@@ -295,10 +347,10 @@
           <input id="companyLegalName" placeholder="Ex. EXEMPLE DEVELOPPEMENT SASU" />
         </label>
         <label>Type / libellé <input id="companyType" placeholder="Ex. SASU, EI LMP, personnel" /></label>
-        <div class="grid two">
-          <label>SIREN <input id="companySiren" inputmode="numeric" placeholder="123456789" /></label>
-          <label>SIRET <input id="companySiret" inputmode="numeric" placeholder="12345678900012" /></label>
-        </div>
+        <label
+          >SIRET (facultatif)
+          <input id="companySiret" inputmode="numeric" placeholder="12345678900012" />
+        </label>
         <label>Adresse <input id="companyAddress" placeholder="12 rue Exemple" /></label>
         <div class="grid two">
           <label>Code postal <input id="companyPostalCode" inputmode="numeric" /></label>
@@ -309,7 +361,8 @@
           <select id="companyScheme">
             <option value="ik2026">Barème IK France 2026</option>
             <option value="bic2025">Barème carburant BIC (dernier officiel : 2025)</option>
-            <option value="fixed">Taux personnalisé</option>
+            <option value="fixed">Taux personnalisé (un seul taux)</option>
+            <option value="custom">Barème personnalisé (par tranches)</option>
             <option value="none">Aucun remboursement</option>
           </select>
         </label>
@@ -317,6 +370,20 @@
           >Taux personnalisé €/km
           <input id="companyFixedRate" type="text" inputmode="decimal" placeholder="0,139" />
         </label>
+        <div id="customScaleWrap" class="hidden scale-editor">
+          <label
+            >Nom du barème
+            <input id="customScaleLabel" type="text" placeholder="Ex. Barème interne 2026" />
+          </label>
+          <p class="hint">
+            Chaque tranche s'applique au cumul de kilomètres de l'année. Le forfait
+            s'ajoute au montant de la tranche, comme dans le barème officiel
+            (« km × 0,357 + 1 395 »). La dernière tranche couvre les grandes distances.
+          </p>
+          <div id="scaleBrackets"></div>
+          <button id="addBracketBtn" type="button" class="ghost">+ Ajouter une tranche</button>
+          <p id="scalePreview" class="hint"></p>
+        </div>
         <div class="dialog-actions">
           <button value="cancel">Annuler</button>
           <button id="saveCompanyDialogBtn" value="default" class="primary">Enregistrer</button>
@@ -343,7 +410,7 @@
         <label
           >Carburant pour le barème BIC
           <select id="vehicleFuel">
-            <option value="petrol">Super sans plomb</option>
+            <option value="petrol">Essence sans plomb</option>
             <option value="diesel">Gazole</option>
             <option value="lpg">GPL</option>
           </select>

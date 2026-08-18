@@ -105,7 +105,25 @@ describe('en-tete du rapport', () => {
     expect(block.present).toBe(true);
     expect(block.displayName).toBe('SASU EXEMPLE');
     expect(block.addressLines).toEqual(['5 avenue des Tests', '69000 Lyon']);
-    expect(block.identifiers).toEqual(['SIREN 123 456 789', 'SIRET 123 456 789 00012']);
+    // Le SIRET contient deja le SIREN : les afficher tous deux ferait doublon.
+    expect(block.identifiers).toEqual(['SIRET 123 456 789 00012']);
+  });
+
+  it('se rabat sur le SIREN quand le SIRET n’est pas renseigné', () => {
+    const sansSiret = createCompany({
+      id: 'c8',
+      name: 'SASU C',
+      siren: '987654321',
+      calculationMode: 'ik2026',
+    });
+    const result = buildReport({
+      trips: [],
+      companies: [sansSiret],
+      vehicles: [],
+      beneficiary,
+      filters: { companyId: 'c8' },
+    });
+    expect(result.company.identifiers).toEqual(['SIREN 987 654 321']);
   });
 
   it('n’affiche que les identifiants renseignes', () => {

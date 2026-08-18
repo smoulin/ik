@@ -9,6 +9,12 @@
 import { CALCULATION_MODES } from '../models.js';
 import { annualIkAmount, ikBracketLabel, getIkScale, normalizeCv } from './ikScale.js';
 import { bicRate, getBicScale } from './bicScale.js';
+import {
+  customAnnualAmount,
+  customBracketLabel,
+  describeCustomScale,
+  normalizeCustomScale,
+} from './customScale.js';
 import { CURRENT_IK_SCALE_YEAR, CURRENT_BIC_SCALE_YEAR } from './scales.js';
 import { formatRate } from '../../shared/format.js';
 
@@ -143,6 +149,21 @@ function computeOne({ company, vehicle, km, beforeKm, afterKm }) {
       };
     }
 
+    case CALCULATION_MODES.CUSTOM: {
+      const scale = normalizeCustomScale(company?.calculationSettings?.customScale);
+      // Meme calcul marginal que le bareme officiel : le franchissement d'une
+      // tranche en cours d'annee est donc gere sans cas particulier.
+      const amount = customAnnualAmount(afterKm, scale) - customAnnualAmount(beforeKm, scale);
+      return {
+        ...base,
+        amount,
+        rate: null,
+        rateInfo: `${scale.label} · ${customBracketLabel(afterKm, scale)}`,
+        method: `${scale.label} (cumul annuel — ${describeCustomScale(scale)})`,
+        scaleYear: null,
+      };
+    }
+
     default:
       return {
         ...base,
@@ -168,6 +189,10 @@ export function calculationModeLabel(company, vehicle = null) {
       const scale = getBicScale();
       if (!vehicle) return `${scale.label} (taux selon le véhicule)`;
       return `${scale.label} (${formatRate(bicRate(vehicle))})`;
+    }
+    case CALCULATION_MODES.CUSTOM: {
+      const scale = normalizeCustomScale(company?.calculationSettings?.customScale);
+      return `${scale.label} — ${describeCustomScale(scale)}`;
     }
     case CALCULATION_MODES.FIXED: {
       const rate = Number(company?.calculationSettings?.fixedRate) || 0;

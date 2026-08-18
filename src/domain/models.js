@@ -19,6 +19,8 @@ export const CALCULATION_MODES = /** @type {const} */ ({
   IK: 'ik2026',
   BIC: 'bic2025',
   FIXED: 'fixed',
+  /** Bareme a tranches defini par l'utilisateur (cf. domain/mileage/customScale.js). */
+  CUSTOM: 'custom',
   NONE: 'none',
 });
 
@@ -27,6 +29,25 @@ export const FUEL_TYPES = /** @type {const} */ ({
   DIESEL: 'diesel',
   LPG: 'lpg',
 });
+
+/**
+ * Provenance de la distance d'un trajet.
+ * 'gps' designe une trace reellement enregistree, la source la plus fiable.
+ */
+export const DISTANCE_SOURCES = ['manual', 'routing', 'gps'];
+
+/**
+ * Itineraire demande au calcul. Volontairement declare ici plutot qu'importe
+ * du fournisseur : le modele de donnees ne doit dependre d'aucun service.
+ */
+export const ROUTE_PREFERENCES_ALLOWED = ['fastest', 'no-highway', 'no-toll'];
+
+/** Libelles affichables, y compris dans les rapports. */
+export const ROUTE_PREFERENCE_LABELS = {
+  fastest: 'Le plus rapide',
+  'no-highway': 'Sans autoroute',
+  'no-toll': 'Sans péage',
+};
 
 /* ------------------------------------------------------------------ */
 /* Adresse                                                             */
@@ -165,6 +186,9 @@ export function createCompany(input = {}) {
       calculationMode: normalizeCalculationMode(input.calculationMode ?? input.scheme),
       calculationSettings: {
         fixedRate: num(input.calculationSettings?.fixedRate ?? input.fixedRate) ?? 0,
+        // Bareme a tranches, utilise par le mode 'custom'. Conserve tel quel :
+        // sa normalisation appartient a domain/mileage/customScale.js.
+        customScale: input.calculationSettings?.customScale ?? input.customScale ?? null,
       },
       active: input.active !== false,
     },
@@ -222,7 +246,8 @@ export function createVehicle(input = {}) {
  * @property {number} km
  * @property {string} purpose
  * @property {boolean} roundTrip
- * @property {string} distanceSource  'manual' | 'routing'
+ * @property {string} distanceSource  'manual' | 'routing' | 'gps'
+ * @property {string} routePreference  itineraire retenu : 'fastest' | 'no-highway' | 'no-toll'
  */
 export function createTrip(input = {}) {
   return withMeta(
@@ -237,7 +262,13 @@ export function createTrip(input = {}) {
       km: num(input.km) ?? 0,
       purpose: str(input.purpose),
       roundTrip: Boolean(input.roundTrip),
-      distanceSource: input.distanceSource === 'routing' ? 'routing' : 'manual',
+      distanceSource: DISTANCE_SOURCES.includes(input.distanceSource)
+        ? input.distanceSource
+        : 'manual',
+      // Conserve pour que le rapport puisse indiquer quel itineraire a servi.
+      routePreference: ROUTE_PREFERENCES_ALLOWED.includes(input.routePreference)
+        ? input.routePreference
+        : 'fastest',
     },
     input,
     'trip',
@@ -272,6 +303,69 @@ export function createFavoritePlace(input = {}) {
     input,
     'place',
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* Trace GPS                                                           */
+/* ------------------------------------------------------------------ */
+
+/** Etats d'une trace importee. */
+export const TRACK_STATUSES = ['pending', 'converted', 'ignored'];
+
+/**
+ * Trajet enregistre par le GPS, avant d'etre transforme en trajet declarable.
+ *
+ * Une trace est une donnee brute : elle porte la distance mesuree et le trace,
+ * mais ni structure ni motif. C'est l'utilisateur qui la valide, et c'est a ce
+ * moment qu'elle devient un trajet (`tripId` renseigne, statut « converted »).
+ *
+ * @typedef {object} Track
+ * @property {string} id
+ * @property {string} source        'gpx' pour l'instant
+ * @property {string} fileName
+ * @property {string} startedAt     ISO
+ * @property {string} endedAt       ISO
+ * @property {number} distanceMeters   distance retenue, apres filtrage
+ * @property {number} rawDistanceMeters distance brute, avant filtrage
+ * @property {object} quality       compteurs de points retenus et ecartes
+ * @property {{latitude:number,longitude:number,label:string,placeId:string|null}} start
+ * @property {{latitude:number,longitude:number,label:string,placeId:string|null}} end
+ * @property {Array<[number,number]>} geometry
+ * @property {string} status        'pending' | 'converted' | 'ignored'
+ * @property {string|null} tripId   trajet cree a partir de cette trace
+ */
+export function createTrack(input = {}) {
+  return withMeta(
+    {
+      source: str(input.source) || 'gpx',
+      fileName: str(input.fileName),
+      startedAt: str(input.startedAt),
+      endedAt: str(input.endedAt),
+      distanceMeters: num(input.distanceMeters) ?? 0,
+      rawDistanceMeters: num(input.rawDistanceMeters) ?? 0,
+      quality: input.quality ?? null,
+      start: trackEndpoint(input.start),
+      end: trackEndpoint(input.end),
+      geometry: Array.isArray(input.geometry) ? input.geometry : [],
+      status: TRACK_STATUSES.includes(input.status) ? input.status : 'pending',
+      tripId: input.tripId ? str(input.tripId) : null,
+    },
+    input,
+    'track',
+  );
+}
+
+function trackEndpoint(value) {
+  if (!value) return null;
+  const latitude = num(value.latitude);
+  const longitude = num(value.longitude);
+  if (latitude === null || longitude === null) return null;
+  return {
+    latitude,
+    longitude,
+    label: str(value.label),
+    placeId: value.placeId ? str(value.placeId) : null,
+  };
 }
 
 /* ------------------------------------------------------------------ */

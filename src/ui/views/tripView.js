@@ -4,6 +4,7 @@
 
 import { byId, el, fillSelect, setHidden } from '../dom.js';
 import { attachAddressAutocomplete } from '../components/addressAutocomplete.js';
+import { createRouteMap } from '../components/routeMap.js';
 import { computeTripAmounts } from '../../domain/mileage/engine.js';
 import {
   formatKm,
@@ -24,18 +25,36 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     km: byId('tripKm'),
     purpose: byId('tripPurpose'),
     roundTrip: byId('roundTrip'),
+    routePreference: byId('routePreference'),
   };
 
   const saveBtn = byId('saveTripBtn');
   const cancelBtn = byId('cancelEditBtn');
   const calcBtn = byId('calcDistanceBtn');
   const statusEl = byId('routeStatus');
+  const mapBtn = byId('showMapBtn');
+  const mapContainer = byId('routeMap');
 
   /** Coordonnees connues des adresses saisies : evite un geocodage inutile. */
   let fromCoords = null;
   let toCoords = null;
   let editingId = null;
+  /** Trace GPS a l'origine du brouillon, marquee comme traitee a l'enregistrement. */
+  let draftTrackId = null;
   let calculating = false;
+
+  /** Trace du dernier calcul, conservee pour l'affichage a la demande. */
+  let lastGeometry = null;
+  const routeMap = createRouteMap(mapContainer);
+
+  /**
+   * Distance aller du dernier calcul reseau. Elle permet de basculer
+   * aller simple / aller-retour instantanement, sans rappeler le fournisseur.
+   */
+  let lastOneWayKm = null;
+
+  /** Anti-rebond du recalcul automatique : le serveur accepte 1 requete/seconde. */
+  let recalcTimer = null;
 
   const fromAutocomplete = attachAddressAutocomplete(fields.from, {
     service: geo.addressSearchService,
@@ -67,6 +86,46 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     statusEl.className = `status ${kind}`;
   }
 
+  function itineraryLabel(preference) {
+    return (
+      { fastest: 'le plus rapide', 'no-highway': 'sans autoroute', 'no-toll': 'sans péage' }[
+        preference
+      ] || 'le plus rapide'
+    );
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Carte, affichee uniquement sur demande explicite                  */
+  /* ---------------------------------------------------------------- */
+
+  function hideMap() {
+    setHidden(mapContainer, true);
+    mapBtn.textContent = 'Voir le trajet sur la carte';
+  }
+
+  async function toggleMap() {
+    if (!mapContainer.classList.contains('hidden')) {
+      hideMap();
+      return;
+    }
+    if (!lastGeometry) return;
+
+    mapBtn.disabled = true;
+    try {
+      setHidden(mapContainer, false);
+      await routeMap.show(lastGeometry, {
+        from: fields.from.value.trim(),
+        to: fields.to.value.trim(),
+      });
+      mapBtn.textContent = 'Masquer la carte';
+    } catch (error) {
+      hideMap();
+      showStatus(`Carte indisponible : ${error.message}`, 'bad');
+    } finally {
+      mapBtn.disabled = false;
+    }
+  }
+
   /* ---------------------------------------------------------------- */
   /* Calcul de distance                                                */
   /* ---------------------------------------------------------------- */
@@ -93,15 +152,29 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
         fromCoords,
         toCoords,
         roundTrip: fields.roundTrip.checked,
+        preference: fields.routePreference.value,
       });
 
       fromCoords = result.fromCoords;
       toCoords = result.toCoords;
       fields.km.value = formatDecimalInput(result.km, 1);
 
+      lastOneWayKm = result.oneWayKm;
+      lastGeometry = result.geometry;
+      setHidden(mapBtn, !lastGeometry);
+      hideMap();
+
       const sens = fields.roundTrip.checked ? 'Aller-retour' : 'Aller simple';
-      showStatus(`${sens} : ${formatKm(result.km)} · calcul routier OpenStreetMap/OSRM`, 'good');
+      const itineraire = itineraryLabel(fields.routePreference.value);
+      // La duree renvoyee par Valhalla est peu fiable hors autoroute : on ne
+      // l'affiche pas, seule la distance est exploitable.
+      showStatus(`${sens} · ${itineraire} : ${formatKm(result.km)}`, 'good');
     } catch (error) {
+      lastGeometry = null;
+      // La distance aller n'est plus fiable : on ne doit plus proposer de
+      // basculer en aller-retour a partir d'une valeur perimee.
+      lastOneWayKm = null;
+      setHidden(mapBtn, true);
       showStatus(`${error.message} Tu peux saisir les kilomètres manuellement.`, 'bad');
     } finally {
       calculating = false;
@@ -131,7 +204,8 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
       km,
       purpose: fields.purpose.value.trim(),
       roundTrip: fields.roundTrip.checked,
-      distanceSource: fromCoords && toCoords ? 'routing' : 'manual',
+      distanceSource: draftTrackId ? 'gps' : fromCoords && toCoords ? 'routing' : 'manual',
+      routePreference: fields.routePreference.value,
     };
 
     const problem = validate(trip);
@@ -144,6 +218,8 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     saveBtn.disabled = true;
     try {
       await store.saveTrip(trip);
+      // La trace GPS d'origine ne doit plus figurer parmi les trajets a valider.
+      if (draftTrackId) await store.markTrackConverted(draftTrackId);
       const wasEditing = Boolean(editingId);
       reset();
       showStatus(wasEditing ? 'Trajet modifié.' : 'Trajet enregistré.', 'good');
@@ -178,9 +254,39 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     fields.purpose.value = '';
     fields.roundTrip.checked = false;
     fields.date.value = todayIso();
+    fields.routePreference.value = 'fastest';
+    lastGeometry = null;
+    lastOneWayKm = null;
+    if (recalcTimer !== null) {
+      clearTimeout(recalcTimer);
+      recalcTimer = null;
+    }
+    setHidden(mapBtn, true);
+    hideMap();
     saveBtn.textContent = 'Enregistrer le trajet';
     setHidden(cancelBtn, true);
     showStatus('');
+  }
+
+  /**
+   * Pré-remplit le formulaire depuis une trace GPS, sans l'enregistrer.
+   * La distance vient de la mesure : elle ne doit pas être recalculée.
+   */
+  function loadDraft(draft) {
+    if (!draft) return;
+    reset();
+
+    fields.date.value = draft.date || todayIso();
+    if (draft.companyId) fields.company.value = draft.companyId;
+    fromAutocomplete.setValue(draft.from || '');
+    toAutocomplete.setValue(draft.to || '');
+    fields.km.value = formatDecimalInput(draft.km);
+    fromCoords = draft.fromCoords || null;
+    toCoords = draft.toCoords || null;
+    draftTrackId = draft.trackId || null;
+
+    setHidden(cancelBtn, false);
+    showStatus('Trajet enregistré par le GPS : complète le motif puis valide.', '');
   }
 
   /** Charge un trajet existant dans le formulaire (bouton « Modifier »). */
@@ -197,6 +303,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     fields.km.value = formatDecimalInput(trip.km);
     fields.purpose.value = trip.purpose || '';
     fields.roundTrip.checked = Boolean(trip.roundTrip);
+    fields.routePreference.value = trip.routePreference || 'fastest';
     fromCoords = trip.fromCoords;
     toCoords = trip.toCoords;
 
@@ -220,6 +327,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     fields.km.value = formatDecimalInput(trip.km);
     fields.purpose.value = trip.purpose || '';
     fields.roundTrip.checked = Boolean(trip.roundTrip);
+    fields.routePreference.value = trip.routePreference || 'fastest';
     fromCoords = trip.fromCoords;
     toCoords = trip.toCoords;
 
@@ -271,19 +379,48 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     const company = store.getCompany(trip.companyId);
     const vehicle = store.getVehicle(trip.vehicleId);
 
+    // Meme presentation et memes actions que dans l'historique : le trajet qui
+    // vient d'etre saisi est justement celui qu'on veut pouvoir corriger.
     container.append(
-      el('strong', { text: `${trip.from} → ${trip.to}` }),
-      el('div', {
-        class: 'meta',
-        text: [
-          formatDateFr(trip.date),
-          company?.name || '?',
-          vehicle?.name || '?',
-          formatKm(trip.km),
-          formatMoney(computed?.amount || 0),
-        ].join(' · '),
-      }),
+      el('div', { class: 'trip-item' }, [
+        el('div', { class: 'trip-main' }, [
+          el('strong', { text: `${trip.from} → ${trip.to}` }),
+          el('div', {
+            class: 'meta',
+            text: [formatDateFr(trip.date), company?.name || '?', vehicle?.name || '?'].join(' · '),
+          }),
+          el('div', {
+            class: 'meta strong',
+            text: [
+              formatKm(trip.km),
+              formatMoney(computed?.amount || 0),
+              trip.roundTrip ? 'aller-retour' : null,
+              trip.purpose || null,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          }),
+        ]),
+        el('div', { class: 'trip-actions' }, [
+          el('button', { text: 'Modifier', onClick: () => edit(trip.id) }),
+          el('button', { text: 'Dupliquer', onClick: () => duplicate(trip.id) }),
+          el('button', {
+            class: 'danger',
+            text: 'Suppr.',
+            onClick: () => removeTrip(trip.id),
+          }),
+        ]),
+      ]),
     );
+  }
+
+  /** Suppression depuis « Dernier trajet », avec la meme confirmation qu'ailleurs. */
+  async function removeTrip(id) {
+    if (!window.confirm('Supprimer ce trajet ?')) return;
+    await store.deleteTrip(id);
+    // Si le trajet supprime etait en cours d'edition, le formulaire n'a plus d'objet.
+    if (editingId === id) reset();
+    onSaved();
   }
 
   /* ---------------------------------------------------------------- */
@@ -291,10 +428,41 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
   calcBtn.addEventListener('click', calculateDistance);
   saveBtn.addEventListener('click', save);
   cancelBtn.addEventListener('click', reset);
+  mapBtn.addEventListener('click', toggleMap);
+
+  // Aller-retour : la distance aller est deja connue, un simple facteur suffit.
+  // Aucun appel reseau, donc reponse immediate.
   fields.roundTrip.addEventListener('change', () => {
-    // La distance affichee ne correspond plus au sens choisi : on invite a recalculer.
-    if (fields.km.value) showStatus('Le sens a changé : relance le calcul si besoin.', '');
+    if (lastOneWayKm === null) return;
+    const km = fields.roundTrip.checked ? lastOneWayKm * 2 : lastOneWayKm;
+    fields.km.value = formatDecimalInput(Math.round(km * 10) / 10, 1);
+    const sens = fields.roundTrip.checked ? 'Aller-retour' : 'Aller simple';
+    showStatus(`${sens} · ${itineraryLabel(fields.routePreference.value)} : ${formatKm(km)}`, 'good');
   });
 
-  return { refresh, edit, duplicate, reset };
+  // Changement d'itineraire : la distance doit etre recalculee cote serveur.
+  // On le declenche automatiquement, avec un delai qui evite d'enchainer les
+  // requetes si l'utilisateur parcourt la liste (le serveur accepte 1 req/s).
+  fields.routePreference.addEventListener('change', () => {
+    lastGeometry = null;
+    setHidden(mapBtn, true);
+    hideMap();
+    scheduleRecalculation();
+  });
+
+  function scheduleRecalculation() {
+    if (recalcTimer !== null) clearTimeout(recalcTimer);
+
+    // Rien à recalculer tant qu'aucun trajet n'a été résolu.
+    if (!fields.from.value.trim() || !fields.to.value.trim()) return;
+    if (lastOneWayKm === null) return;
+
+    showStatus('Nouvel itinéraire : calcul en cours…');
+    recalcTimer = setTimeout(() => {
+      recalcTimer = null;
+      calculateDistance();
+    }, 400);
+  }
+
+  return { refresh, edit, duplicate, reset, loadDraft };
 }

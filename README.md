@@ -70,14 +70,27 @@ Pour en changer, écrire un module respectant le contrat décrit dans
 | --- | --- | --- |
 | Autocomplétion | API Adresse (BAN, `api-adresse.data.gouv.fr`) | Photon (Komoot) |
 | Géocodage | API Adresse (BAN) | Nominatim (OpenStreetMap) |
-| Itinéraire | OSRM (serveur public de démonstration) | — |
+| Itinéraire | Valhalla (serveur public FOSSGIS) | — |
+| Fond de carte | Tuiles OpenStreetMap, à la demande uniquement | — |
 
 **Pourquoi la BAN et pas Nominatim pour l'autocomplétion :** la politique
 d'usage de Nominatim interdit explicitement l'envoi d'une requête à chaque
 frappe. L'API Adresse est au contraire conçue pour cet usage, ne demande aucune
 clé ni carte bancaire, et renvoie directement les coordonnées.
 
-> ⚠️ Le serveur OSRM utilisé est une instance publique de démonstration, sans
+**Pourquoi Valhalla et pas OSRM pour les itinéraires :** OSRM optimise uniquement
+le temps de parcours — il emprunte donc systématiquement l'autoroute — refuse
+toute exclusion (`exclude=motorway` et `exclude=toll` sont rejetés par le serveur
+public) et ne renvoie aucune alternative. Valhalla est le seul moteur gratuit et
+sans clé qui sache éviter autoroutes et péages.
+
+> ⚠️ **Limites mesurées de Valhalla.** Ses distances dépassent celles de
+> ViaMichelin d'environ 3 km sur le trajet de référence, et ses **durées sont
+> franchement fausses hors autoroute** — 1 h 37 annoncée pour un parcours réalisé
+> en 51 min. L'interface n'affiche donc que la distance. Le module
+> `osrmRoutingProvider.js` est conservé, non câblé, comme point de comparaison.
+
+> ⚠️ Le serveur Valhalla utilisé est une instance publique de démonstration, sans
 > garantie de service et destinée à un usage léger. Elle convient à une
 > application personnelle ; elle devra être remplacée par une instance dédiée ou
 > une offre commerciale si Agilmea IK est commercialisé.
@@ -158,8 +171,13 @@ sans restriction un usage commercial et ne contamine pas le code du projet.
 | `vitest` | Tests | MIT |
 | `fake-indexeddb` | IndexedDB en mémoire pour les tests | MIT |
 
-L'application n'embarque **aucune dépendance à l'exécution** : le code livré est
-entièrement écrit dans ce dépôt.
+Une seule dépendance à l'exécution :
+
+| Dépendance | Rôle | Licence |
+| --- | --- | --- |
+| `leaflet` | Carte du trajet, chargée uniquement à l'ouverture | BSD 2-Clause |
+
+Hormis Leaflet, chargé à la demande, tout le code livré est écrit dans ce dépôt.
 
 Les données d'adresses (BAN, OpenStreetMap) sont sous licence **ODbL** :
 l'attribution est requise — elle figure dans Réglages → À propos — mais aucune

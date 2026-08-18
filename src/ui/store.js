@@ -13,9 +13,11 @@ import {
   favoritePlaceRepository,
   beneficiaryRepository,
   settingsRepository,
+  trackRepository,
 } from '../data/repositories/index.js';
 import { SETTING_KEYS } from '../data/repositories/settingsRepository.js';
 import { recentAddressRepository } from '../data/repositories/recentAddressRepository.js';
+import { splitFrenchAddress } from '../shared/address.js';
 
 export function createStore() {
   const state = {
@@ -103,8 +105,13 @@ export function createStore() {
     ];
     for (const entry of entries) {
       if (!entry.label) continue;
+      // Le code postal et la ville sont deduits du libelle : sans eux, choisir
+      // plus tard cette adresse laissait ces champs vides dans les formulaires.
+      const { postalCode, city } = splitFrenchAddress(entry.label);
       await recentAddressRepository.record({
         label: entry.label,
+        postalCode,
+        city,
         latitude: entry.coords?.latitude ?? null,
         longitude: entry.coords?.longitude ?? null,
       });
@@ -159,6 +166,12 @@ export function createStore() {
     await load();
   }
 
+  /** Marque une trace GPS comme traitee : elle quitte l'ecran d'accueil. */
+  async function markTrackConverted(trackId) {
+    const track = await trackRepository.get(trackId);
+    if (track) await trackRepository.save({ ...track, status: 'converted' });
+  }
+
   async function deleteAllTrips() {
     for (const trip of state.trips) await tripRepository.remove(trip.id);
     await load();
@@ -187,6 +200,7 @@ export function createStore() {
     deleteTrip,
     deleteFavoritePlace,
     deleteAllTrips,
+    markTrackConverted,
     companyUsage,
     vehicleUsage,
     getCompany,

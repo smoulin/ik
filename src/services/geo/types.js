@@ -9,6 +9,8 @@
  * Ce fichier ne contient que des types et des fabriques : aucune implementation.
  */
 
+import { completeSuggestionLocality } from '../../shared/address.js';
+
 /**
  * Suggestion d'adresse normalisee, quelle que soit sa provenance.
  *
@@ -71,8 +73,20 @@
  * @property {(from: {latitude: number, longitude: number}, to: {latitude: number, longitude: number}, options?: {signal?: AbortSignal}) => Promise<RouteResult>} route
  */
 
-/** Fabrique une suggestion complete a partir d'un objet partiel. */
+/**
+ * Fabrique une suggestion complete a partir d'un objet partiel.
+ *
+ * Le code postal et la ville sont deduits du libelle quand la source ne les
+ * fournit pas — cas des adresses recentes et des favoris incomplets. Sans
+ * cela, choisir une adresse deja connue laissait ces champs vides dans les
+ * formulaires beneficiaire, structure et lieu favori.
+ */
 export function createSuggestion(input) {
+  const raw = buildSuggestion(input);
+  return completeSuggestionLocality(raw);
+}
+
+function buildSuggestion(input) {
   const label = String(input.label || '').trim();
   const secondary = String(input.secondary || '').trim();
   return {
