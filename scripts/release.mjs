@@ -84,8 +84,10 @@ if (branch === PRODUCTION_BRANCH) {
 console.log('\n[release] Tests…');
 run('npm', ['test']);
 
-console.log('\n[release] Build…');
-run('npm', ['run', 'build']);
+// Le build vient APRES la mise a jour de la version, plus bas : la version est
+// injectee dans le bundle au moment du build. Construire avant produirait un
+// dist/ portant l'ancien numero, et `npm run preview` afficherait une version
+// differente de celle qui vient d'etre taguee.
 
 /* ------------------------------------------------------------------ */
 /* 3. Nouvelle version                                                 */
@@ -127,7 +129,14 @@ console.log(
 );
 
 /* ------------------------------------------------------------------ */
-/* 5. Commit et tag                                                    */
+/* 5. Build, avec le numero de version definitif                       */
+/* ------------------------------------------------------------------ */
+
+console.log('\n[release] Build…');
+run('npm', ['run', 'build']);
+
+/* ------------------------------------------------------------------ */
+/* 6. Commit et tag                                                    */
 /* ------------------------------------------------------------------ */
 
 run('git', ['add', 'package.json', 'package-lock.json', 'CHANGELOG.md']);
