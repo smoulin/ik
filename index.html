@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <meta name="theme-color" content="#111827" />
+    <meta name="theme-color" content="#1b2a4a" />
     <meta
       name="description"
       content="Agilmea IK — suivi des frais kilométriques multi-structures avec calcul automatique de distance routière."
@@ -20,9 +20,12 @@
     </div>
 
     <header class="app-header screen-only">
-      <div>
-        <h1>Agilmea IK</h1>
-        <p>Trajets, kilomètres automatiques et rapports séparés</p>
+      <div class="brand">
+        <span id="brandLogo" aria-hidden="true"></span>
+        <div>
+          <h1>Agilmea IK</h1>
+          <p>Frais kilométriques</p>
+        </div>
       </div>
       <button id="installBtn" class="ghost hidden">Installer</button>
     </header>
@@ -134,13 +137,18 @@
             <h2>Historique</h2>
             <button id="clearTripsBtn" class="danger ghost">Tout effacer</button>
           </div>
+          <div class="scope-switch" role="group" aria-label="Période affichée">
+            <button data-scope="day" class="scope-btn">Jour</button>
+            <button data-scope="month" class="scope-btn active">Mois</button>
+            <button data-scope="year" class="scope-btn">Année</button>
+          </div>
           <div class="month-nav">
-            <button id="prevMonthBtn" class="ghost" aria-label="Mois précédent">‹</button>
+            <button id="prevPeriodBtn" class="ghost" aria-label="Période précédente">‹</button>
             <div class="month-current">
               <strong id="monthLabel">—</strong>
-              <button id="allMonthsBtn" class="link-btn">Voir toute l’année</button>
+              <button id="todayBtn" class="link-btn">Aujourd’hui</button>
             </div>
-            <button id="nextMonthBtn" class="ghost" aria-label="Mois suivant">›</button>
+            <button id="nextPeriodBtn" class="ghost" aria-label="Période suivante">›</button>
           </div>
           <label class="history-filter"
             >Structure

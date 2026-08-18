@@ -8,6 +8,17 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+### Ajouté
+- **Identité visuelle Agilmea.** Bleu marine profond, or et blanc, repris du
+  logo : le monogramme figure dans l'en-tête, redessiné en vectoriel. Le bleu
+  porte la structure et les actions, l'or ne sert que d'accent — un liseré, un
+  état actif — jamais un aplat. Titres en capitales espacées, à l'image du
+  mot-symbole. Icônes de l'application régénérées aux couleurs de la marque,
+  par un script versionné ().
+- **Sélection de la période par jour, mois ou année** dans « Tous les trajets »,
+  le mois restant la vue par défaut. Un bouton « Aujourd'hui » ramène à la
+  période courante.
+
 ## [0.5.0] — 2026-08-18
 
 ### Ajouté

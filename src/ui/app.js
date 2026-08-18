@@ -14,8 +14,11 @@ import { createHistoryView } from './views/historyView.js';
 import { createReportsView } from './views/reportsView.js';
 import { createSettingsView } from './views/settingsView.js';
 import { createGeoServices } from '../services/geo/index.js';
+import { mountHeaderLogo } from './components/logo.js';
 
 export async function createApp({ appVersion }) {
+  mountHeaderLogo(byId('brandLogo'));
+
   const store = createStore();
   const geo = createGeoServices();
 

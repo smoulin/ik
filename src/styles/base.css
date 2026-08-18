@@ -1,21 +1,59 @@
 /*
  * Agilmea IK — styles d'ecran.
- * Reprise de l'identite visuelle de la v0.1.1, remise en forme lisible et
- * completee pour l'autocompletion, les lieux favoris et le bandeau de mise a jour.
+ *
+ * Identite reprise du logo Agilmea : bleu marine profond, or, blanc, et une
+ * typographie geometrique tres espacee pour les titres. Le bleu porte la
+ * structure et les actions, l'or ne sert que d'accent — un liseré, un etat
+ * actif, jamais un aplat.
  */
 
 :root {
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color: #111827;
-  background: #f3f4f6;
+  font-family:
+    'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', 'Inter', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--page);
 
-  --primary: #111827;
-  --muted: #6b7280;
-  --border: #d1d5db;
-  --line: #e5e7eb;
-  --danger: #b91c1c;
-  --good: #047857;
-  --favorite: #b45309;
+  /* Palette de marque, prelevee sur le logo. */
+  --brand-ink: #1b2a4a;
+  --brand-ink-deep: #12203a;
+  --brand-ink-soft: #2f4370;
+  --gold: #b08d4f;
+  --gold-soft: #d6c199;
+  --gold-wash: #fbf7f0;
+
+  --primary: var(--brand-ink);
+  --text: #17223a;
+  --muted: #6b7488;
+  --border: #d7dbe4;
+  --line: #e8eaf0;
+  --page: #f4f5f8;
+  --surface: #ffffff;
+
+  --danger: #a32020;
+  --good: #1c6b52;
+  --favorite: var(--gold);
+
+  --radius: 14px;
+  --shadow-sm: 0 1px 2px #1b2a4a0f;
+  --shadow-md: 0 6px 20px #1b2a4a14;
+  --shadow-lg: 0 14px 38px #1b2a4a1f;
+}
+
+/* Titres : capitales espacees, comme le mot-symbole du logo. */
+h1,
+h2,
+h3 {
+  letter-spacing: 0.02em;
+  color: var(--brand-ink);
+}
+
+.card h2,
+.card h3 {
+  font-size: 14px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--brand-ink-soft);
 }
 
 * {
@@ -913,4 +951,322 @@ dialog form {
     width: 100%;
     justify-content: flex-start;
   }
+}
+
+/* ================================================================= */
+/* Identité Agilmea — surcharges de présentation                      */
+/* ================================================================= */
+
+body {
+  background: var(--page);
+}
+
+/* --- En-tête : bandeau marine avec le monogramme --- */
+
+.app-header {
+  background: var(--brand-ink);
+  padding: 14px 18px;
+  gap: 12px;
+  /* Filet doré : rappel discret du cadre du logo. */
+  border-bottom: 2px solid var(--gold);
+  box-shadow: var(--shadow-md);
+}
+
+.app-header h1 {
+  font-size: 17px;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 500;
+}
+
+.app-header p {
+  color: #aab4c8;
+  letter-spacing: 0.01em;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Le monogramme est en marine sur fond marine : on l'éclaircit ici. */
+.brand svg {
+  flex-shrink: 0;
+  --brand-ink: #ffffff;
+  --gold: var(--gold-soft);
+}
+
+.app-header .ghost {
+  color: #fff;
+  border-color: #ffffff59;
+  background: transparent;
+}
+
+/* --- Cartes --- */
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 17px;
+}
+
+/* --- Boutons --- */
+
+button,
+.file-button {
+  border-radius: 10px;
+  border-color: var(--border);
+  color: var(--brand-ink);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--brand-ink-soft);
+}
+
+button.primary {
+  background: var(--brand-ink);
+  border-color: var(--brand-ink);
+  letter-spacing: 0.03em;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--brand-ink-deep);
+  border-color: var(--brand-ink-deep);
+}
+
+button.ghost {
+  border-color: var(--border);
+}
+
+input,
+select {
+  border-radius: 10px;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid var(--brand-ink-soft);
+  outline-offset: 1px;
+  border-color: var(--brand-ink-soft);
+}
+
+label {
+  color: var(--brand-ink-soft);
+}
+
+/* --- Navigation basse --- */
+
+.bottom-nav {
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -2px 14px #1b2a4a12;
+}
+
+.bottom-nav button.active {
+  color: var(--brand-ink);
+  /* Le liseré actif est doré, seul accent de couleur de la barre. */
+  box-shadow: inset 0 2px 0 var(--gold);
+}
+
+.bottom-nav .nav-add {
+  background: var(--brand-ink);
+  box-shadow: 0 4px 14px #1b2a4a45;
+  border: 2px solid var(--gold);
+}
+
+.bottom-nav .nav-add:hover:not(:disabled) {
+  background: var(--brand-ink-deep);
+}
+
+.nav-badge {
+  background: var(--gold);
+  color: var(--brand-ink-deep);
+}
+
+/* --- Sélecteur de période --- */
+
+.scope-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.scope-btn {
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  padding: 10px 6px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.scope-btn + .scope-btn {
+  border-left: 1px solid var(--line);
+}
+
+.scope-btn.active {
+  background: var(--brand-ink);
+  color: #fff;
+}
+
+.month-current strong {
+  color: var(--brand-ink);
+  letter-spacing: 0.01em;
+}
+
+/* --- Listes de trajets --- */
+
+.trip-card {
+  border-color: var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.trip-summary:hover {
+  background: var(--gold-wash);
+}
+
+.trip-endpoint .dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--brand-ink);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.trip-figures .km {
+  color: var(--brand-ink);
+}
+
+.trip-figures .amount {
+  color: var(--gold);
+  font-weight: 650;
+}
+
+.trip-details {
+  background: #fbfbfd;
+}
+
+.day-head {
+  border-bottom-color: var(--gold-soft);
+}
+
+.day-date {
+  color: var(--brand-ink);
+  letter-spacing: 0.02em;
+}
+
+/* --- Synthèses --- */
+
+.summary {
+  border-color: var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.summary strong {
+  color: var(--brand-ink);
+  font-size: 19px;
+}
+
+/* --- Pastilles de structure --- */
+
+.company-chip.selected {
+  background: var(--brand-ink);
+  border-color: var(--brand-ink);
+}
+
+/* --- Autocomplétion --- */
+
+.autocomplete-panel {
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border);
+}
+
+.autocomplete-option.source-favorite {
+  background: var(--gold-wash);
+}
+
+.autocomplete-option.source-favorite .autocomplete-icon,
+.autocomplete-option.source-favorite .autocomplete-primary {
+  color: var(--gold);
+}
+
+.autocomplete-secondary.is-address {
+  color: var(--brand-ink-soft);
+}
+
+.autocomplete-option.source-favorite.active,
+.autocomplete-option.source-favorite:hover {
+  background: #f6efe2;
+}
+
+/* --- Bandeaux --- */
+
+.update-banner {
+  background: var(--brand-ink);
+  border-bottom: 2px solid var(--gold);
+}
+
+.update-banner button {
+  background: var(--gold);
+  color: var(--brand-ink-deep);
+  border-color: var(--gold);
+}
+
+.warning {
+  border-color: var(--gold-soft);
+  background: var(--gold-wash);
+}
+
+.status.warn {
+  border-color: var(--gold-soft);
+  background: var(--gold-wash);
+  color: #7a5f2a;
+}
+
+/* --- Onglet Réglages : dialogues --- */
+
+dialog {
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+dialog h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-size: 14px;
+  color: var(--brand-ink-soft);
+}
+
+.settings-item {
+  border-color: var(--line);
+  border-radius: 12px;
+}
+
+.settings-item strong {
+  color: var(--brand-ink);
+}
+
+.scale-editor {
+  background: var(--gold-wash);
+  border-color: var(--gold-soft);
 }

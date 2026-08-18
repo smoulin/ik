@@ -8,7 +8,7 @@
  * leur politique d'usage autant qu'à la discrétion attendue de l'application.
  */
 
-import { byId, el, fillSelect, setHidden } from '../dom.js';
+import { byId, qsa, el, fillSelect, setHidden } from '../dom.js';
 import { createRouteMap } from '../components/routeMap.js';
 import { computeTripAmounts } from '../../domain/mileage/engine.js';
 import { formatKm, formatMoney } from '../../shared/format.js';
@@ -34,22 +34,31 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
   const totals = byId('historyTotals');
   const monthLabel = byId('monthLabel');
 
-  /** Mois affiché. `null` signifie « toute l'année ». */
-  const today = new Date();
-  let year = today.getFullYear();
-  let month = today.getMonth();
-  let wholeYear = false;
+  /**
+   * Periode affichee : une granularite et une date de reference.
+   * Le mois est la vue par defaut — c'est la maille d'un etat de frais.
+   */
+  let scope = 'month';
+  let cursor = new Date();
 
   const expanded = new Set();
   const maps = new Map();
 
   companyFilter.addEventListener('change', render);
-  byId('prevMonthBtn').addEventListener('click', () => shiftMonth(-1));
-  byId('nextMonthBtn').addEventListener('click', () => shiftMonth(1));
-  byId('allMonthsBtn').addEventListener('click', () => {
-    wholeYear = !wholeYear;
+  byId('prevPeriodBtn').addEventListener('click', () => shiftPeriod(-1));
+  byId('nextPeriodBtn').addEventListener('click', () => shiftPeriod(1));
+  byId('todayBtn').addEventListener('click', () => {
+    cursor = new Date();
     render();
   });
+
+  for (const button of qsa('.scope-btn')) {
+    button.addEventListener('click', () => {
+      scope = button.dataset.scope;
+      qsa('.scope-btn').forEach((b) => b.classList.toggle('active', b === button));
+      render();
+    });
+  }
 
   byId('clearTripsBtn').addEventListener('click', async () => {
     if (!store.state.trips.length) return;
@@ -61,12 +70,47 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
     onChanged();
   });
 
-  function shiftMonth(delta) {
-    wholeYear = false;
-    const date = new Date(year, month + delta, 1);
-    year = date.getFullYear();
-    month = date.getMonth();
+  /** Avance ou recule d'une unite de la granularite courante. */
+  function shiftPeriod(delta) {
+    const d = new Date(cursor);
+    if (scope === 'day') d.setDate(d.getDate() + delta);
+    else if (scope === 'month') d.setMonth(d.getMonth() + delta, 1);
+    else d.setFullYear(d.getFullYear() + delta, 0, 1);
+    cursor = d;
     render();
+  }
+
+  /**
+   * Prefixe ISO de la periode affichee. Les dates etant stockees en
+   * AAAA-MM-JJ, un simple prefixe suffit a filtrer jour, mois ou annee.
+   */
+  function periodPrefix() {
+    const year = cursor.getFullYear();
+    const month = String(cursor.getMonth() + 1).padStart(2, '0');
+    const day = String(cursor.getDate()).padStart(2, '0');
+
+    if (scope === 'day') return `${year}-${month}-${day}`;
+    if (scope === 'month') return `${year}-${month}`;
+    return String(year);
+  }
+
+  function periodLabel() {
+    if (scope === 'day') {
+      return cursor.toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+    if (scope === 'month') return `${MOIS[cursor.getMonth()]} ${cursor.getFullYear()}`;
+    return String(cursor.getFullYear());
+  }
+
+  function emptyLabel() {
+    if (scope === 'day') return 'Aucun trajet ce jour-là.';
+    if (scope === 'month') return `Aucun trajet en ${periodLabel()}.`;
+    return `Aucun trajet en ${periodLabel()}.`;
   }
 
   /* ---------------------------------------------------------------- */
@@ -75,9 +119,7 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
 
   function selectedTrips() {
     const companyId = companyFilter.value;
-    const prefix = wholeYear
-      ? String(year)
-      : `${year}-${String(month + 1).padStart(2, '0')}`;
+    const prefix = periodPrefix();
 
     return store.state.trips
       .filter((trip) => !companyId || trip.companyId === companyId)
@@ -94,8 +136,7 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
   /* ---------------------------------------------------------------- */
 
   function render() {
-    monthLabel.textContent = wholeYear ? String(year) : `${MOIS[month]} ${year}`;
-    byId('allMonthsBtn').textContent = wholeYear ? 'Revenir au mois' : 'Voir toute l’année';
+    monthLabel.textContent = periodLabel();
 
     const trips = selectedTrips();
     const computations = computeTripAmounts(store.state.trips, {
@@ -109,14 +150,7 @@ export function createHistoryView({ store, onEdit, onDuplicate, onChanged = () =
     maps.clear();
 
     if (!trips.length) {
-      list.append(
-        el('p', {
-          class: 'hint',
-          text: wholeYear
-            ? 'Aucun trajet cette année.'
-            : `Aucun trajet en ${MOIS[month]} ${year}.`,
-        }),
-      );
+      list.append(el('p', { class: 'hint', text: emptyLabel() }));
       return;
     }
 
