@@ -19,6 +19,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 - Effet de bord bienvenu : « Enregistrer » devient le bouton par défaut de
   chacune de ces boîtes. Auparavant, « Annuler » venant en premier dans le
   balisage, la touche Entrée visait le mauvais bouton.
+- Rapport par structure : le titre de chaque bloc reprend le corps des autres
+  titres de cartes, dont il était le seul à s'écarter.
 
 ## [0.8.0] — 2026-08-18
 
