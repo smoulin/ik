@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.8.0] — 2026-08-18
+
 ### Modifié
 - **Onglets renommés d'après l'écran qu'ils ouvrent.** « Accueil » désignait une
   position et non la tâche : cet écran est la file des trajets GPS à valider, il
