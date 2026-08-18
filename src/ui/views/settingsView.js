@@ -9,6 +9,7 @@ import { suggestionToAddress } from '../../services/geo/types.js';
 import { calculationModeLabel } from '../../domain/mileage/engine.js';
 import { formatAddressOneLine, isAddressEmpty, composeAddressLabel } from '../../domain/models.js';
 import { parseDecimal, formatDecimalInput } from '../../shared/format.js';
+import { mountScaleEditor, defaultCustomScale } from '../components/scaleEditor.js';
 import { buildBackup, restoreBackup, inspectBackup } from '../../services/backup/backupService.js';
 import { GEO_ATTRIBUTIONS } from '../../services/geo/index.js';
 
@@ -107,10 +108,14 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     },
   });
 
+  const scaleEditor = mountScaleEditor();
+
   companyFields.scheme.addEventListener('change', toggleFixedRate);
 
   function toggleFixedRate() {
-    setHidden(byId('fixedRateWrap'), companyFields.scheme.value !== 'fixed');
+    const mode = companyFields.scheme.value;
+    setHidden(byId('fixedRateWrap'), mode !== 'fixed');
+    setHidden(byId('customScaleWrap'), mode !== 'custom');
   }
 
   function openCompanyDialog(id = null) {
@@ -127,6 +132,7 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     companyFields.city.value = company?.address?.city || '';
     companyFields.scheme.value = company?.calculationMode || 'ik2026';
     companyFields.fixedRate.value = formatDecimalInput(company?.calculationSettings?.fixedRate);
+    scaleEditor.setScale(company?.calculationSettings?.customScale || defaultCustomScale());
     companyAddressCoords = company?.address?.latitude
       ? { latitude: company.address.latitude, longitude: company.address.longitude }
       : null;
@@ -159,6 +165,17 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     }
     const fixedRate = parsedRate ?? 0;
 
+    // Bareme a tranches : on refuse un bareme incoherent plutot que de produire
+    // des montants imprevisibles.
+    const isCustom = companyFields.scheme.value === 'custom';
+    if (isCustom) {
+      const problems = scaleEditor.validate();
+      if (problems.length) {
+        window.alert(problems.join('\n'));
+        return;
+      }
+    }
+
     await store.saveCompany({
       id: companyFields.id.value || undefined,
       name,
@@ -179,7 +196,14 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
         longitude: companyAddressCoords?.longitude ?? null,
       },
       calculationMode: companyFields.scheme.value,
-      calculationSettings: { fixedRate },
+      calculationSettings: {
+        fixedRate,
+        // Hors mode « barème personnalisé », on conserve le barème déjà saisi :
+        // basculer temporairement de mode ne doit pas le faire perdre.
+        customScale: isCustom
+          ? scaleEditor.getScale()
+          : (store.getCompany(companyFields.id.value)?.calculationSettings?.customScale ?? null),
+      },
     });
 
     companyDialog.close();

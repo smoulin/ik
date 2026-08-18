@@ -320,7 +320,8 @@
           <select id="companyScheme">
             <option value="ik2026">Barème IK France 2026</option>
             <option value="bic2025">Barème carburant BIC (dernier officiel : 2025)</option>
-            <option value="fixed">Taux personnalisé</option>
+            <option value="fixed">Taux personnalisé (un seul taux)</option>
+            <option value="custom">Barème personnalisé (par tranches)</option>
             <option value="none">Aucun remboursement</option>
           </select>
         </label>
@@ -328,6 +329,20 @@
           >Taux personnalisé €/km
           <input id="companyFixedRate" type="text" inputmode="decimal" placeholder="0,139" />
         </label>
+        <div id="customScaleWrap" class="hidden scale-editor">
+          <label
+            >Nom du barème
+            <input id="customScaleLabel" type="text" placeholder="Ex. Barème interne 2026" />
+          </label>
+          <p class="hint">
+            Chaque tranche s'applique au cumul de kilomètres de l'année. Le forfait
+            s'ajoute au montant de la tranche, comme dans le barème officiel
+            (« km × 0,357 + 1 395 »). La dernière tranche couvre les grandes distances.
+          </p>
+          <div id="scaleBrackets"></div>
+          <button id="addBracketBtn" type="button" class="ghost">+ Ajouter une tranche</button>
+          <p id="scalePreview" class="hint"></p>
+        </div>
         <div class="dialog-actions">
           <button value="cancel">Annuler</button>
           <button id="saveCompanyDialogBtn" value="default" class="primary">Enregistrer</button>

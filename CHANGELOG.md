@@ -8,6 +8,37 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+### Ajouté
+- **Barème personnalisé par tranches.** Une structure peut désormais utiliser son
+  propre barème : autant de tranches que nécessaire, chacune avec un taux au
+  kilomètre et, si besoin, un forfait qui s'y ajoute — exactement la forme du
+  barème officiel (« km × 0,357 + 1 395 »). Les tranches s'apprécient sur le
+  cumul annuel, et un trajet à cheval sur deux tranches est calculé au taux
+  marginal, sans cas particulier. Un aperçu du barème s'affiche pendant la
+  saisie, et un barème incohérent est refusé plutôt que de produire des montants
+  imprévisibles.
+- Le rapport indique le barème appliqué, tranche par tranche.
+
+### Corrigé
+- **Code postal et ville vides après le choix d'une adresse déjà utilisée.**
+  Les adresses proposées comme « récentes » étaient enregistrées sans localité,
+  laissant ces deux champs vides dans le bénéficiaire, la structure et les lieux
+  favoris. La localité est maintenant déduite du libellé lorsqu'elle manque, et
+  les adresses récentes la conservent. Le champ « adresse » ne répète plus le
+  code postal ni la ville, qui ont leurs propres champs.
+
+### Modifié
+- Le **SIREN** disparaît du formulaire de structure : le SIRET le contient déjà
+  (ses neuf premiers chiffres). Le rapport n'affiche plus qu'un identifiant, et
+  se rabat sur le SIREN si le SIRET n'est pas renseigné. Le SIRET est marqué
+  facultatif.
+- « Super sans plomb » devient « Essence sans plomb ».
+- Le libellé « Itinéraire » disparaît au-dessus du sélecteur, redondant avec les
+  options elles-mêmes.
+- **« Dernier trajet » propose Modifier, Dupliquer et Supprimer**, comme
+  l'historique : c'est le trajet qu'on vient de saisir, donc celui qu'on veut
+  pouvoir corriger immédiatement.
+
 ## [0.3.0] — 2026-08-18
 
 ### Ajouté

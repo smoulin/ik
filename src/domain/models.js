@@ -19,6 +19,8 @@ export const CALCULATION_MODES = /** @type {const} */ ({
   IK: 'ik2026',
   BIC: 'bic2025',
   FIXED: 'fixed',
+  /** Bareme a tranches defini par l'utilisateur (cf. domain/mileage/customScale.js). */
+  CUSTOM: 'custom',
   NONE: 'none',
 });
 
@@ -184,6 +186,9 @@ export function createCompany(input = {}) {
       calculationMode: normalizeCalculationMode(input.calculationMode ?? input.scheme),
       calculationSettings: {
         fixedRate: num(input.calculationSettings?.fixedRate ?? input.fixedRate) ?? 0,
+        // Bareme a tranches, utilise par le mode 'custom'. Conserve tel quel :
+        // sa normalisation appartient a domain/mileage/customScale.js.
+        customScale: input.calculationSettings?.customScale ?? input.customScale ?? null,
       },
       active: input.active !== false,
     },
