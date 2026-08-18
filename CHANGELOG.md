@@ -8,6 +8,22 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.8.1] — 2026-08-18
+
+### Corrigé
+- **« Annuler » n'exige plus de remplir le formulaire.** Dans les boîtes
+  « Ajouter une structure », « Ajouter un véhicule » et « Ajouter un lieu
+  favori », ce bouton était un bouton de soumission (le comportement par défaut
+  d'un `<button>` dans un `<form>`) : le navigateur validait donc les champs
+  obligatoires et affichait « Veuillez renseigner ce champ » au moment précis où
+  l'utilisateur renonçait à saisir. Les trois boutons passent en
+  `type="button"` et ferment la boîte explicitement.
+- Effet de bord bienvenu : « Enregistrer » devient le bouton par défaut de
+  chacune de ces boîtes. Auparavant, « Annuler » venant en premier dans le
+  balisage, la touche Entrée visait le mauvais bouton.
+- Rapport par structure : le titre de chaque bloc reprend le corps des autres
+  titres de cartes, dont il était le seul à s'écarter.
+
 ## [0.8.0] — 2026-08-18
 
 ### Modifié

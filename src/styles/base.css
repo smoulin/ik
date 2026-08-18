@@ -1420,7 +1420,8 @@ dialog h2 {
 }
 
 .by-company h3 {
-  font-size: 13px;
+  /* Meme corps que tous les titres de carte : ce titre n'a pas a faire exception. */
+  font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--brand-ink-soft);

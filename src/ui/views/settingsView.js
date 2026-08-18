@@ -141,6 +141,12 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     companyDialog.showModal();
   }
 
+  // « Annuler » ferme la boite, sans rien valider. En bouton de soumission (le
+  // defaut d'un <button> dans un <form>), il declenchait la validation HTML des
+  // champs requis : « Veuillez renseigner ce champ » alors que l'utilisateur
+  // renonce justement a saisir. D'ou type="button" et fermeture explicite.
+  byId('cancelCompanyDialogBtn').addEventListener('click', () => companyDialog.close());
+
   byId('saveCompanyDialogBtn').addEventListener('click', async (event) => {
     event.preventDefault();
 
@@ -261,6 +267,8 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     vehicleDialog.showModal();
   }
 
+  byId('cancelVehicleDialogBtn').addEventListener('click', () => vehicleDialog.close());
+
   byId('saveVehicleDialogBtn').addEventListener('click', async (event) => {
     event.preventDefault();
     const name = vehicleFields.name.value.trim();
@@ -351,6 +359,8 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     placeFields.longitude.value = formatDecimalInput(place?.longitude);
     placeDialog.showModal();
   }
+
+  byId('cancelPlaceDialogBtn').addEventListener('click', () => placeDialog.close());
 
   byId('savePlaceDialogBtn').addEventListener('click', async (event) => {
     event.preventDefault();
