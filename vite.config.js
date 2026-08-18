@@ -16,6 +16,9 @@ const pkg = JSON.parse(readFileSync(resolve(rootDir, 'package.json'), 'utf8'));
  */
 const base = process.env.BASE_PATH || './';
 
+/** Port du serveur local : impose par l'environnement, ou laisse a Vite. */
+const devPort = process.env.PORT ? Number(process.env.PORT) : undefined;
+
 /**
  * Genere le service worker de production a partir du modele src/pwa/sw-template.js.
  *
@@ -74,8 +77,16 @@ export default defineConfig({
     target: 'es2020',
     sourcemap: false,
   },
+  // Aucun port fixe : l'application n'a besoin d'aucune adresse particuliere
+  // (ni rappel OAuth, ni webhook, et les services d'adresses et de tuiles
+  // acceptent toutes les origines). On respecte donc le port fourni par
+  // l'environnement, et Vite en choisit un libre a defaut.
   server: {
-    port: 5173,
+    port: devPort,
+    open: false,
+  },
+  preview: {
+    port: devPort,
     open: false,
   },
   plugins: [serviceWorkerPlugin()],
