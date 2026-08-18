@@ -5,13 +5,15 @@
       "name": "agilmea-ik-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--host"],
-      "port": 5173
+      "port": 5173,
+      "autoPort": true
     },
     {
       "name": "agilmea-ik-preview",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "preview", "--", "--host", "--port", "4173"],
-      "port": 4173
+      "runtimeArgs": ["run", "preview", "--", "--host"],
+      "port": 4173,
+      "autoPort": true
     }
   ]
 }
