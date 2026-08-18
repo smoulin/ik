@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.6.0] — 2026-08-18
+
 ### Ajouté
 - **Identité visuelle Agilmea.** Bleu marine profond, or et blanc, repris du
   logo : le monogramme figure dans l'en-tête, redessiné en vectoriel. Le bleu
