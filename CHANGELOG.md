@@ -8,6 +8,41 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+### Ajouté
+- **Enregistrement automatique des trajets par le GPS.** Une trace GPX produite
+  par GPSLogger — déclenchée par la connexion Bluetooth du véhicule — s'importe
+  dans l'application, qui en tire la distance **réellement parcourue**. C'est la
+  seule source qui connaisse la route effectivement empruntée : aucun calcul
+  d'itinéraire ne peut savoir que l'autoroute n'a pas été prise.
+  Le fichier s'importe depuis l'écran d'accueil, ou se partage directement
+  depuis GPSLogger vers Agilmea IK.
+- **Reconnaissance des lieux favoris** : une extrémité de trace située à moins
+  de 200 m d'un favori en reprend l'adresse. Un trajet Domicile → Bureau se
+  nomme donc tout seul.
+- **Filtrage du bruit GPS** : les positions trop imprécises, la dérive à l'arrêt
+  et les sauts de position sont écartés. Sans cela, la distance est
+  systématiquement surestimée. Le détail des points retenus et écartés est
+  affiché avec chaque trace.
+- **Nouvelle navigation à cinq entrées** : Accueil, Tous les trajets, un bouton
+  d'ajout central, Rapports et Réglages.
+- **Écran d'accueil** : les trajets enregistrés par le GPS y attendent d'être
+  complétés, avec le montant estimé selon la structure choisie, puis validés en
+  un geste. Un compteur signale ceux qui restent en attente.
+- **Affectation par pastilles de structure** plutôt qu'une bascule
+  personnel/professionnel : chaque structure garde ainsi son propre barème.
+- **Vue mensuelle** dans « Tous les trajets », avec navigation mois par mois,
+  trajets regroupés par jour et total journalier.
+- **Trajets dépliables**, avec la carte du parcours. Elle n'est chargée qu'à
+  l'ouverture d'un trajet : une carte par ligne enverrait les coordonnées de
+  tous les trajets aux serveurs de tuiles à chaque affichage de l'historique.
+
+### Modifié
+- La base de données passe en version 2, par simple ajout du magasin des traces.
+  Les données existantes sont conservées telles quelles.
+
+### Corrigé
+- Le bouton « Générer le rapport » n'est plus collé aux boutons de période.
+
 ## [0.4.0] — 2026-08-18
 
 ### Ajouté

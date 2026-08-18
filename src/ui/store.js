@@ -13,6 +13,7 @@ import {
   favoritePlaceRepository,
   beneficiaryRepository,
   settingsRepository,
+  trackRepository,
 } from '../data/repositories/index.js';
 import { SETTING_KEYS } from '../data/repositories/settingsRepository.js';
 import { recentAddressRepository } from '../data/repositories/recentAddressRepository.js';
@@ -165,6 +166,12 @@ export function createStore() {
     await load();
   }
 
+  /** Marque une trace GPS comme traitee : elle quitte l'ecran d'accueil. */
+  async function markTrackConverted(trackId) {
+    const track = await trackRepository.get(trackId);
+    if (track) await trackRepository.save({ ...track, status: 'converted' });
+  }
+
   async function deleteAllTrips() {
     for (const trip of state.trips) await tripRepository.remove(trip.id);
     await load();
@@ -193,6 +200,7 @@ export function createStore() {
     deleteTrip,
     deleteFavoritePlace,
     deleteAllTrips,
+    markTrackConverted,
     companyUsage,
     vehicleUsage,
     getCompany,

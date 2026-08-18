@@ -34,8 +34,32 @@
         <button data-tab="settings">Ouvrir les réglages</button>
       </section>
 
+      <!-- ============================ ACCUEIL ============================ -->
+      <section id="tab-home" class="tab-panel active screen-only">
+        <div class="card auto-record">
+          <div class="section-head">
+            <div>
+              <strong>Enregistrement automatique</strong>
+              <div id="autoRecordState" class="meta"></div>
+            </div>
+            <button id="autoRecordHelpBtn" class="ghost">Configurer</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-head">
+            <h2>Trajets à valider</h2>
+            <label class="file-button"
+              >Importer un GPX<input id="importTrackInput" type="file" accept=".gpx,application/gpx+xml" />
+            </label>
+          </div>
+          <div id="trackStatus" class="status"></div>
+          <div id="tracksList" class="trip-list"></div>
+        </div>
+      </section>
+
       <!-- ============================ TRAJET ============================ -->
-      <section id="tab-trip" class="tab-panel active screen-only">
+      <section id="tab-trip" class="tab-panel screen-only">
         <div class="card">
           <h2>Nouveau trajet</h2>
           <div class="grid two">
@@ -110,13 +134,18 @@
             <h2>Historique</h2>
             <button id="clearTripsBtn" class="danger ghost">Tout effacer</button>
           </div>
-          <div class="grid two">
-            <label
-              >Filtrer par structure
-              <select id="historyCompany"><option value="">Toutes</option></select>
-            </label>
-            <label>Année <select id="historyYear"></select></label>
+          <div class="month-nav">
+            <button id="prevMonthBtn" class="ghost" aria-label="Mois précédent">‹</button>
+            <div class="month-current">
+              <strong id="monthLabel">—</strong>
+              <button id="allMonthsBtn" class="link-btn">Voir toute l’année</button>
+            </div>
+            <button id="nextMonthBtn" class="ghost" aria-label="Mois suivant">›</button>
           </div>
+          <label class="history-filter"
+            >Structure
+            <select id="historyCompany"><option value="">Toutes</option></select>
+          </label>
           <div id="historyTotals" class="summary-grid"></div>
           <div id="historyList" class="trip-list"></div>
         </div>
@@ -289,10 +318,14 @@
     </main>
 
     <nav class="bottom-nav screen-only">
-      <button data-tab="trip" class="active">Trajet</button>
-      <button data-tab="history">Historique</button>
-      <button data-tab="reports">Rapports</button>
-      <button data-tab="settings">Réglages</button>
+      <button data-tab="home" class="active">
+        <span class="nav-label">Accueil</span>
+        <span id="homeBadge" class="nav-badge hidden">0</span>
+      </button>
+      <button data-tab="history"><span class="nav-label">Tous les trajets</span></button>
+      <button id="addTripBtn" class="nav-add" data-tab="trip" aria-label="Ajouter un trajet">+</button>
+      <button data-tab="reports"><span class="nav-label">Rapports</span></button>
+      <button data-tab="settings"><span class="nav-label">Réglages</span></button>
     </nav>
 
     <!-- ============================ DIALOGUES ============================ -->

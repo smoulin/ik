@@ -52,8 +52,36 @@ self.addEventListener('message', (event) => {
   }
 });
 
+/** Cache technique du fichier recu par partage Android. */
+const SHARE_CACHE = 'agilmea-share';
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
+
+  // Fichier GPX partage depuis une autre application : le POST ne peut pas
+  // etre lu par la page. On depose donc le fichier dans un cache, puis on
+  // redirige vers l'application, qui viendra le recuperer.
+  if (request.method === 'POST' && new URL(request.url).searchParams.has('share-target')) {
+    event.respondWith(
+      (async () => {
+        try {
+          const form = await request.formData();
+          const file = form.get('track');
+          if (file) {
+            const cache = await caches.open(SHARE_CACHE);
+            await cache.put(
+              'shared-track',
+              new Response(file, { headers: { 'X-Agilmea-Filename': file.name || 'trajet.gpx' } }),
+            );
+          }
+        } catch (error) {
+          console.warn('[sw] partage illisible', error);
+        }
+        return Response.redirect('./?share=1', 303);
+      })(),
+    );
+    return;
+  }
 
   if (request.method !== 'GET') return;
 

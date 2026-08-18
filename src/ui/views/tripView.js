@@ -39,6 +39,8 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
   let fromCoords = null;
   let toCoords = null;
   let editingId = null;
+  /** Trace GPS a l'origine du brouillon, marquee comme traitee a l'enregistrement. */
+  let draftTrackId = null;
   let calculating = false;
 
   /** Trace du dernier calcul, conservee pour l'affichage a la demande. */
@@ -202,7 +204,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
       km,
       purpose: fields.purpose.value.trim(),
       roundTrip: fields.roundTrip.checked,
-      distanceSource: fromCoords && toCoords ? 'routing' : 'manual',
+      distanceSource: draftTrackId ? 'gps' : fromCoords && toCoords ? 'routing' : 'manual',
       routePreference: fields.routePreference.value,
     };
 
@@ -216,6 +218,8 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     saveBtn.disabled = true;
     try {
       await store.saveTrip(trip);
+      // La trace GPS d'origine ne doit plus figurer parmi les trajets a valider.
+      if (draftTrackId) await store.markTrackConverted(draftTrackId);
       const wasEditing = Boolean(editingId);
       reset();
       showStatus(wasEditing ? 'Trajet modifié.' : 'Trajet enregistré.', 'good');
@@ -262,6 +266,27 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     saveBtn.textContent = 'Enregistrer le trajet';
     setHidden(cancelBtn, true);
     showStatus('');
+  }
+
+  /**
+   * Pré-remplit le formulaire depuis une trace GPS, sans l'enregistrer.
+   * La distance vient de la mesure : elle ne doit pas être recalculée.
+   */
+  function loadDraft(draft) {
+    if (!draft) return;
+    reset();
+
+    fields.date.value = draft.date || todayIso();
+    if (draft.companyId) fields.company.value = draft.companyId;
+    fromAutocomplete.setValue(draft.from || '');
+    toAutocomplete.setValue(draft.to || '');
+    fields.km.value = formatDecimalInput(draft.km);
+    fromCoords = draft.fromCoords || null;
+    toCoords = draft.toCoords || null;
+    draftTrackId = draft.trackId || null;
+
+    setHidden(cancelBtn, false);
+    showStatus('Trajet enregistré par le GPS : complète le motif puis valide.', '');
   }
 
   /** Charge un trajet existant dans le formulaire (bouton « Modifier »). */
@@ -439,5 +464,5 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     }, 400);
   }
 
-  return { refresh, edit, duplicate, reset };
+  return { refresh, edit, duplicate, reset, loadDraft };
 }
