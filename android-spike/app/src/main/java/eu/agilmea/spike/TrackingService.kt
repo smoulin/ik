@@ -153,9 +153,12 @@ class TrackingService : Service(), LocationListener {
         val power = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "agilmea-spike:tracking").apply {
             setReferenceCounted(false)
-            // Une heure suffit largement, et la limite evite qu'un oubli vide la
-            // batterie si le service survit a un arret manque.
-            acquire(60 * 60 * 1000L)
+            // Trois heures : largement au-dela du plus long trajet envisage.
+            // Une limite trop courte creerait une coupure de notre fait au
+            // milieu de l'essai, et fausserait la seule mesure qui compte.
+            // La limite reste utile : elle evite de vider la batterie si un
+            // arret est manque.
+            acquire(3 * 60 * 60 * 1000L)
         }
     }
 
