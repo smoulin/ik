@@ -1,0 +1,51 @@
+name: Maquette Android
+
+# Maquette jetable, isolee de l'application : ce workflow ne se declenche que sur
+# sa propre branche et ne publie rien. Il n'a aucun rapport avec deploy.yml, qui
+# reste seul responsable de la mise en ligne d'Agilmea IK.
+on:
+  push:
+    branches: [spike/android-tracker]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Compilation de l'APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: SDK Android
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Compilation
+        working-directory: android-spike
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Taille de l'APK
+        run: ls -lh android-spike/app/build/outputs/apk/debug/*.apk
+
+      - name: Publication de l'artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agilmea-spike-apk
+          path: android-spike/app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+          if-no-files-found: error
