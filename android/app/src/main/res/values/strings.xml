@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Agilmea IK</string>
+    <string name="title_activity_main">Agilmea IK</string>
+    <string name="package_name">eu.agilmea.ik</string>
+    <string name="custom_url_scheme">eu.agilmea.ik</string>
+</resources>

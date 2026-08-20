@@ -4,6 +4,14 @@ dist-ssr/
 .vite/
 coverage/
 
+# APK compiles en local : binaires, jamais dans le depot
+apk-maquette/
+*.apk
+# Cle de signature : sa perte imposerait une desinstallation a chaque mise a jour,
+# sa publication permettrait a n'importe qui de signer une fausse mise a jour.
+*.keystore
+*.jks
+
 # Donnees personnelles : ne doivent JAMAIS entrer dans le depot (voir CONTRIBUTING / section Vie privee)
 *.local
 sauvegarde*.json
