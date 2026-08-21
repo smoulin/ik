@@ -15,6 +15,13 @@ import { byId, el, setHidden } from '../dom.js';
 import { createRouteMap } from '../components/routeMap.js';
 import { trackRepository } from '../../data/repositories/index.js';
 import { createTrackImportService, trackToTripDraft } from '../../services/tracks/trackImportService.js';
+import {
+  isRecorderAvailable,
+  collectSessions,
+  recordingStatus,
+  getVehicle,
+} from '../../services/tracks/nativeRecorder.js';
+import { openRecorderSetup } from '../components/recorderSetup.js';
 import { favoritePlaceRepository } from '../../data/repositories/index.js';
 import { computeTripAmounts } from '../../domain/mileage/engine.js';
 import { toKilometers } from '../../domain/tracks/trackDistance.js';
@@ -40,7 +47,48 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
     if (files.length) await importFiles(files);
   });
 
-  byId('autoRecordHelpBtn').addEventListener('click', showAutoRecordHelp);
+  byId('autoRecordHelpBtn').addEventListener('click', () => {
+    if (!isRecorderAvailable()) {
+      showAutoRecordHelp();
+      return;
+    }
+    openRecorderSetup({ onChanged: refresh }).catch((error) =>
+      setStatus(`Configuration indisponible : ${error.message || error}`, 'bad'),
+    );
+  });
+
+  // Le service enregistre pendant que l'application est fermee : c'est donc a
+  // l'ouverture, et a chaque retour au premier plan, qu'on va chercher ce
+  // qu'il a produit.
+  if (isRecorderAvailable()) {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') collectFromDevice();
+    });
+  }
+
+  /** Recupere les trajets enregistres par le service natif. */
+  async function collectFromDevice() {
+    if (!isRecorderAvailable()) return;
+
+    try {
+      const summary = await collectSessions({
+        importGpx: importService.importGpx,
+        isDuplicate: importService.isDuplicate,
+        // Reimporter la meme trace ne doit pas creer de doublon.
+        discard: (track) => trackRepository.remove(track.id, { hard: true }),
+      });
+
+      await refresh();
+
+      if (summary.imported) {
+        setStatus(`${summary.imported} trajet(s) enregistré(s) récupéré(s).`, 'good');
+      } else if (summary.problems.length) {
+        setStatus(summary.problems.join(' · '), 'bad');
+      }
+    } catch (error) {
+      setStatus(`Récupération impossible : ${error.message || error}`, 'bad');
+    }
+  }
 
   /* ---------------------------------------------------------------- */
   /* Import                                                            */
@@ -116,14 +164,46 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
       .filter((track) => track.status === 'pending')
       .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
 
-    byId('autoRecordState').textContent = tracks.length
-      ? `${tracks.length} trajet(s) enregistré(s) en attente`
-      : 'Aucun trajet en attente. Importe un fichier GPX ou partage-le depuis GPSLogger.';
+    await refreshRecorderState();
 
     badge.textContent = String(tracks.length);
     setHidden(badge, tracks.length === 0);
 
     render();
+  }
+
+  /**
+   * Etat de l'enregistrement automatique.
+   *
+   * Dans le navigateur, la chaine passe encore par un fichier GPX importe a la
+   * main. Dans la coque Android, l'application sait si un trajet est en cours
+   * et quel vehicule le declenche : autant le dire, c'est ce qui rassure sur le
+   * fait que rien n'est en train de se perdre.
+   */
+  async function refreshRecorderState() {
+    const label = byId('autoRecordState');
+
+    if (!isRecorderAvailable()) {
+      label.textContent = tracks.length
+        ? `${tracks.length} trajet(s) enregistré(s) en attente`
+        : 'Aucun trajet en attente. Importe un fichier GPX ou partage-le depuis GPSLogger.';
+      return;
+    }
+
+    try {
+      const [status, vehicle] = await Promise.all([recordingStatus(), getVehicle()]);
+
+      if (status.recording) {
+        label.textContent = `Enregistrement en cours · ${formatKm(status.kilometers)}`;
+        return;
+      }
+
+      label.textContent = vehicle?.name
+        ? `Prêt — démarre à la connexion de ${vehicle.name}.`
+        : 'Aucun véhicule choisi : appuie sur « Configurer ».';
+    } catch {
+      label.textContent = 'Enregistrement automatique indisponible.';
+    }
   }
 
   function render() {
@@ -338,5 +418,5 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
     setStatus('Trajet ignoré.', '');
   }
 
-  return { refresh, importSharedFile };
+  return { refresh, importSharedFile, collectFromDevice };
 }

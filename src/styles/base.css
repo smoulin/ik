@@ -1446,3 +1446,62 @@ dialog h2 {
   color: var(--brand-ink-soft);
   margin: 0 0 9px;
 }
+
+/* ----------------------------------------------------------------- */
+/* Configuration de l'enregistrement automatique (coque Android)       */
+/* ----------------------------------------------------------------- */
+
+/*
+ * Cette boite n'a pas de <form> : ses actions declenchent des demandes
+ * d'autorisation au systeme, pas un envoi. Elle porte donc elle-meme le
+ * remplissage que `dialog form` apporte ailleurs.
+ */
+.recorder-setup {
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.recorder-setup h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand-ink-soft);
+  margin: 18px 0 8px;
+}
+
+.setup-step {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+/* Une etape accordee s'efface ; une etape manquante doit se voir. */
+.setup-step.todo {
+  border-color: var(--gold);
+  background: var(--gold-wash);
+}
+
+.setup-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setup-badge {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.device-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.device-list button {
+  text-align: left;
+  white-space: pre-line;
+  line-height: 1.35;
+}

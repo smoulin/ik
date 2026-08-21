@@ -96,6 +96,10 @@ export async function createApp({ appVersion }) {
   setupInstallPrompt();
   await receiveSharedFile(homeView);
 
+  // Trajets enregistres par le service natif pendant que l'application etait
+  // fermee. Sans await : rien ne doit retarder l'affichage.
+  homeView.collectFromDevice?.().catch(() => {});
+
   return { store, geo, refreshAll, switchTab, homeView };
 }
 
