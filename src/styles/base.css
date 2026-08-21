@@ -60,9 +60,26 @@ h3 {
   box-sizing: border-box;
 }
 
+/*
+ * Zones sures.
+ *
+ * Depuis Android 15, une application qui vise le SDK 35 est affichee bord a
+ * bord : la page passe SOUS la barre d'etat et sous les boutons de navigation.
+ * Il faut donc reserver ces bandes explicitement.
+ *
+ * On lit d'abord la variable injectee par Capacitor, qui mesure les marges
+ * cote natif, et on retombe sur `env()` pour le navigateur. Les WebView Android
+ * anterieures a la version 140 renvoient des valeurs fausses pour `env()` :
+ * s'y fier seul laisserait le bogue en place sur une partie des telephones.
+ */
+:root {
+  --inset-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+
 body {
   margin: 0;
-  padding-bottom: 78px;
+  padding-bottom: calc(78px + var(--inset-bottom));
 }
 
 /* ----------------------------------------------------------------- */
@@ -665,7 +682,6 @@ td.num {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 66px;
   background: #fff;
   border-top: 1px solid #ddd;
   display: grid;
@@ -673,7 +689,9 @@ td.num {
   grid-template-columns: 1fr 1fr auto 1fr 1fr;
   align-items: center;
   z-index: 10;
-  padding-bottom: env(safe-area-inset-bottom);
+  /* Les 66 px utiles, plus la bande occupee par les boutons du telephone. */
+  height: calc(66px + var(--inset-bottom));
+  padding-bottom: var(--inset-bottom);
 }
 
 .bottom-nav button {
@@ -1108,7 +1126,8 @@ body {
 
 .app-header {
   background: var(--brand-ink);
-  padding: 14px 18px;
+  /* La barre d'etat se superpose au bandeau : on lui rend sa hauteur. */
+  padding: calc(14px + var(--inset-top)) 18px 14px;
   gap: 12px;
   /* Filet doré : rappel discret du cadre du logo. */
   border-bottom: 2px solid var(--gold);
