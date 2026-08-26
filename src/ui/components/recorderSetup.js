@@ -17,7 +17,11 @@ import {
   pairedDevices,
   getVehicle,
   setVehicle,
+  readJournal,
+  clearJournal,
+  note,
 } from '../../services/tracks/nativeRecorder.js';
+import { deliverFile } from '../../services/platform/fileDelivery.js';
 
 const STEPS = [
   {
@@ -71,12 +75,13 @@ export async function openRecorderSetup({ onChanged = () => {} } = {}) {
   document.body.append(dialog);
   dialog.showModal();
 
+  note('Ecran de configuration ouvert.');
   await render();
 
   async function render() {
     body.replaceChildren(el('p', { class: 'hint', text: 'Lecture des autorisations…' }));
 
-    const [state, vehicle] = await Promise.all([readiness(), getVehicle()]);
+    const [state, vehicle, diary] = await Promise.all([readiness(), getVehicle(), safeJournal()]);
 
     body.replaceChildren(
       el('h3', { text: '1. Autorisations' }),
@@ -96,7 +101,45 @@ export async function openRecorderSetup({ onChanged = () => {} } = {}) {
           : 'Aucun véhicule choisi — le déclenchement automatique est inactif.',
       }),
       el('button', { text: 'Choisir l’appareil Bluetooth', onClick: chooseVehicle }),
+      el('h3', { text: '3. Journal' }),
+      el('p', {
+        class: 'hint',
+        text:
+          'Le service enregistre application fermée : si un trajet manque, ' +
+          'c’est ici qu’on en trouve la raison.',
+      }),
+      el('pre', { class: 'diary', text: lastLines(diary.journal, 25) || 'Journal vide.' }),
+      el('div', { class: 'button-row' }, [
+        el('button', { text: 'Partager le journal', onClick: () => shareJournal(diary.journal) }),
+        el('button', {
+          text: 'Effacer',
+          onClick: async () => {
+            await clearJournal();
+            await render();
+          },
+        }),
+      ]),
     );
+  }
+
+  async function safeJournal() {
+    return readJournal().catch(() => ({ journal: '', path: '' }));
+  }
+
+  function lastLines(text, count) {
+    return String(text || '')
+      .split('\n')
+      .filter(Boolean)
+      .slice(-count)
+      .join('\n');
+  }
+
+  async function shareJournal(journal) {
+    if (!journal) {
+      window.alert('Le journal est vide.');
+      return;
+    }
+    await deliverFile(journal, 'text/plain', 'agilmea-journal.txt');
   }
 
   function renderStep(step, ok) {
@@ -141,6 +184,7 @@ export async function openRecorderSetup({ onChanged = () => {} } = {}) {
             text: `${device.name}\n${device.address}`,
             onClick: async () => {
               await setVehicle(device);
+              await note(`Vehicule choisi : ${device.name}`);
               picker.close();
               await render();
             },

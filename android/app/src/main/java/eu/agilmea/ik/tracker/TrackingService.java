@@ -57,6 +57,8 @@ public class TrackingService extends Service implements LocationListener {
     private final LiveDistance live = new LiveDistance();
     private File session;
     private PowerManager.WakeLock wakeLock;
+    private String trigger = "?";
+    private boolean stoppedOnPurpose = false;
 
     public static boolean isRunning() {
         return running;
@@ -83,12 +85,17 @@ public class TrackingService extends Service implements LocationListener {
 
         // Ce demarrage peut echouer : depuis Android 12, une application
         // endormie n'a pas le droit de lancer un service de premier plan sans
-        // exemption d'optimisation de batterie.
+        // exemption d'optimisation de batterie. L'echec doit etre consigne,
+        // sans quoi il ne se manifeste que par un trajet manquant.
         try {
             context.startForegroundService(intent);
-        } catch (Exception ignored) {
-            // L'ecran de reglages signale l'exemption manquante ; inutile de
-            // faire tomber l'application depuis un recepteur de diffusion.
+        } catch (Exception error) {
+            Diary.log(
+                context,
+                "ECHEC du demarrage (" + trigger + ") : " + error.getClass().getSimpleName()
+                    + " — " + error.getMessage()
+                    + ". Verifie « Batterie sans restriction » dans les reglages."
+            );
         }
     }
 
@@ -114,13 +121,19 @@ public class TrackingService extends Service implements LocationListener {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+            stoppedOnPurpose = true;
             stopSelf();
             return START_NOT_STICKY;
         }
 
         if (running) return START_STICKY;
 
+        trigger = intent != null && intent.getStringExtra(EXTRA_TRIGGER) != null
+            ? intent.getStringExtra(EXTRA_TRIGGER)
+            : "?";
+
         if (!hasLocationPermission()) {
+            Diary.log(this, "Demarrage impossible : AUTORISATION DE POSITION ABSENTE.");
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -128,6 +141,11 @@ public class TrackingService extends Service implements LocationListener {
         try {
             goToForeground();
         } catch (Exception error) {
+            Diary.log(
+                this,
+                "ECHEC du passage en premier plan : " + error.getClass().getSimpleName()
+                    + " — " + error.getMessage()
+            );
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -139,14 +157,18 @@ public class TrackingService extends Service implements LocationListener {
         try {
             session = Sessions.begin(this, new Date());
         } catch (Exception error) {
+            Diary.log(this, "ECHEC de l'ouverture du fichier : " + error.getMessage());
             stopSelf();
             return START_NOT_STICKY;
         }
 
         running = true;
+        stoppedOnPurpose = false;
         startedAtMs = System.currentTimeMillis();
         kilometers = 0d;
         points = 0;
+
+        Diary.log(this, "----- Debut d'enregistrement (" + trigger + ") -> " + session.getName());
 
         holdWakeLock();
         requestUpdates();
@@ -198,6 +220,18 @@ public class TrackingService extends Service implements LocationListener {
         live.add(fix);
         kilometers = live.kilometers();
         points = live.received();
+
+        // Une ligne par position : c'est ce qui permet de voir, apres coup, si
+        // le systeme a cesse de nous alimenter et a quelle heure exactement.
+        Diary.log(
+            this,
+            String.format(
+                Locale.FRANCE,
+                "position  precision %s m  cumul %.2f km",
+                fix.accuracy == null ? "?" : String.format(Locale.FRANCE, "%.0f", fix.accuracy),
+                kilometers
+            )
+        );
 
         updateNotification();
     }
@@ -271,11 +305,27 @@ public class TrackingService extends Service implements LocationListener {
             }
         }
 
+        String name = session != null ? session.getName() : "aucun";
         if (session != null) Sessions.end(session);
         session = null;
 
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         wakeLock = null;
+
+        String summary = String.format(
+            Locale.FRANCE,
+            "%.1f km, %d positions, fichier %s",
+            live.kilometers(), live.received(), name
+        );
+
+        // Un arret que personne n'a demande, c'est le systeme qui a coupe.
+        // C'est le resultat le plus important a faire ressortir.
+        Diary.log(
+            this,
+            stoppedOnPurpose
+                ? "----- Fin d'enregistrement (arret demande) : " + summary
+                : "----- COUPURE SUBIE, arret non demande : " + summary
+        );
 
         super.onDestroy();
     }

@@ -42,8 +42,24 @@ final class Sessions {
 
     private Sessions() {}
 
+    /**
+     * Dossier externe de l'application.
+     *
+     * Externe et non interne, deliberement : le stockage interne est invisible
+     * depuis un gestionnaire de fichiers, donc impossible a inspecter quand
+     * quelque chose ne va pas. Ici, traces et journal restent recuperables sans
+     * passer par l'application — ce qui compte le jour ou c'est justement
+     * l'application qui ne repond pas.
+     */
+    static File baseDirectory(Context context) {
+        File external = context.getExternalFilesDir(null);
+        File dir = external != null ? external : context.getFilesDir();
+        if (!dir.exists()) dir.mkdirs();
+        return dir;
+    }
+
     static File directory(Context context) {
-        File dir = new File(context.getFilesDir(), "tracks");
+        File dir = new File(baseDirectory(context), "traces");
         if (!dir.exists()) dir.mkdirs();
         return dir;
     }

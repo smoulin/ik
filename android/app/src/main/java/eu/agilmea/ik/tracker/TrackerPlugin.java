@@ -259,4 +259,30 @@ public class TrackerPlugin extends Plugin {
         if (file != null) file.delete();
         call.resolve();
     }
+
+    /* ---------------------------------------------------------------- */
+    /* Journal de diagnostic                                             */
+    /* ---------------------------------------------------------------- */
+
+    @PluginMethod
+    public void readJournal(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("journal", Diary.read(getContext()));
+        result.put("path", Diary.file(getContext()).getAbsolutePath());
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void clearJournal(PluginCall call) {
+        Diary.clear(getContext());
+        Diary.log(getContext(), "Journal efface a la demande.");
+        call.resolve();
+    }
+
+    /** Consigne un evenement venu de l'interface : ouverture, reglage, choix. */
+    @PluginMethod
+    public void note(PluginCall call) {
+        Diary.log(getContext(), call.getString("message", ""));
+        call.resolve();
+    }
 }

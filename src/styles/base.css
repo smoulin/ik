@@ -1505,3 +1505,19 @@ dialog h2 {
   white-space: pre-line;
   line-height: 1.35;
 }
+
+/* Journal de diagnostic : lisibilite avant elegance. */
+.recorder-setup .diary {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #f4f5f8;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  margin: 0 0 10px;
+}

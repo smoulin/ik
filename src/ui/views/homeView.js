@@ -20,6 +20,7 @@ import {
   collectSessions,
   recordingStatus,
   getVehicle,
+  readiness,
 } from '../../services/tracks/nativeRecorder.js';
 import { openRecorderSetup } from '../components/recorderSetup.js';
 import { favoritePlaceRepository } from '../../data/repositories/index.js';
@@ -191,16 +192,30 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
     }
 
     try {
-      const [status, vehicle] = await Promise.all([recordingStatus(), getVehicle()]);
+      const [status, vehicle, state] = await Promise.all([
+        recordingStatus(),
+        getVehicle(),
+        readiness(),
+      ]);
 
       if (status.recording) {
         label.textContent = `Enregistrement en cours · ${formatKm(status.kilometers)}`;
         return;
       }
 
-      label.textContent = vehicle?.name
-        ? `Prêt — démarre à la connexion de ${vehicle.name}.`
-        : 'Aucun véhicule choisi : appuie sur « Configurer ».';
+      // Un prerequis manquant ne se voit nulle part ailleurs : sans lui, le
+      // trajet ne sera tout simplement jamais enregistre, et l'absence ne
+      // s'explique pas d'elle-meme.
+      const missing = [
+        !vehicle?.name ? 'aucun véhicule choisi' : null,
+        !state.location ? 'position refusée' : null,
+        !state.backgroundLocation ? 'position en arrière-plan refusée' : null,
+        !state.batteryUnrestricted ? 'batterie restreinte' : null,
+      ].filter(Boolean);
+
+      label.textContent = missing.length
+        ? `Inactif — ${missing.join(', ')}. Appuie sur « Configurer ».`
+        : `Prêt — démarre à la connexion de ${vehicle.name}.`;
     } catch {
       label.textContent = 'Enregistrement automatique indisponible.';
     }

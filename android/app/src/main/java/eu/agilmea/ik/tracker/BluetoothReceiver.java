@@ -23,13 +23,25 @@ public class BluetoothReceiver extends BroadcastReceiver {
         BluetoothDevice device = deviceOf(intent);
         if (device == null) return;
 
-        String chosen = Vehicle.address(context);
-        if (chosen == null || !chosen.equalsIgnoreCase(device.getAddress())) return;
-
         String action = intent.getAction();
+        String event = BluetoothDevice.ACTION_ACL_CONNECTED.equals(action) ? "Connexion" : "Deconnexion";
+
+        String chosen = Vehicle.address(context);
+        if (chosen == null) {
+            // Cas le plus frequent quand rien ne s'enregistre : l'utilisateur
+            // n'a pas encore designe le vehicule. Le dire, plutot que de se
+            // taire.
+            Diary.log(context, event + " Bluetooth ignoree : AUCUN VEHICULE CHOISI dans les reglages.");
+            return;
+        }
+
+        if (!chosen.equalsIgnoreCase(device.getAddress())) return;
+
         if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+            Diary.log(context, "Vehicule connecte -> demarrage demande.");
             TrackingService.start(context, "bluetooth");
         } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+            Diary.log(context, "Vehicule deconnecte -> arret demande.");
             TrackingService.stop(context, "bluetooth");
         }
     }

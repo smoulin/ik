@@ -63,6 +63,30 @@ export function setVehicle(device) {
   return Tracker.setVehicle(device ? { address: device.address, name: device.name } : {});
 }
 
+/* ------------------------------------------------------------------ */
+/* Journal de diagnostic                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Le service enregistre application fermee : quand il echoue, personne n'est
+ * la pour le voir. Le journal est la seule facon de savoir apres coup ce qui
+ * s'est passe — et surtout, ce qui ne s'est pas passe.
+ */
+export async function readJournal() {
+  if (!isRecorderAvailable()) return { journal: '', path: '' };
+  return Tracker.readJournal();
+}
+
+export function clearJournal() {
+  return Tracker.clearJournal();
+}
+
+/** Consigne un evenement d'interface, pour recoller les faits ensuite. */
+export function note(message) {
+  if (!isRecorderAvailable()) return Promise.resolve();
+  return Tracker.note({ message }).catch(() => {});
+}
+
 /** Enregistrement en cours : distance et nombre de points, pour l'affichage. */
 export function recordingStatus() {
   return Tracker.status();
