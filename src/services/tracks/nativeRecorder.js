@@ -63,6 +63,17 @@ export function setVehicle(device) {
   return Tracker.setVehicle(device ? { address: device.address, name: device.name } : {});
 }
 
+/**
+ * Version de la coque Android installee.
+ *
+ * La version du code web ne suffit pas a distinguer deux APK : c'est le
+ * numero du paquet Android qui dit ce que le telephone execute reellement.
+ */
+export async function nativeBuild() {
+  if (!isRecorderAvailable()) return null;
+  return Tracker.buildInfo().catch(() => null);
+}
+
 /* ------------------------------------------------------------------ */
 /* Journal de diagnostic                                               */
 /* ------------------------------------------------------------------ */

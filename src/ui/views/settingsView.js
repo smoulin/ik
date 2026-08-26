@@ -12,6 +12,7 @@ import { parseDecimal, formatDecimalInput } from '../../shared/format.js';
 import { mountScaleEditor, defaultCustomScale } from '../components/scaleEditor.js';
 import { buildBackup, restoreBackup, inspectBackup } from '../../services/backup/backupService.js';
 import { GEO_ATTRIBUTIONS } from '../../services/geo/index.js';
+import { nativeBuild } from '../../services/tracks/nativeRecorder.js';
 
 export function createSettingsView({ store, geo, appVersion, onChanged = () => {} }) {
   /* ================================================================ */
@@ -473,6 +474,17 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
 
   function refreshAbout() {
     byId('aboutVersion').textContent = `Agilmea IK v${appVersion}`;
+
+    // Dans la coque Android, on ajoute la version du paquet : c'est la seule
+    // qui distingue deux APK une fois installes.
+    nativeBuild()
+      .then((build) => {
+        if (!build) return;
+        byId('aboutVersion').textContent =
+          `Agilmea IK v${appVersion} · coque ${build.versionName} (${build.versionCode})`;
+      })
+      .catch(() => {});
+
     byId('aboutStorage').textContent =
       'Données enregistrées uniquement sur cet appareil (IndexedDB). Aucune donnée n’est envoyée à un serveur, hormis les adresses recherchées, transmises au service de recherche d’adresses.';
     byId('aboutAttributions').textContent = GEO_ATTRIBUTIONS.join(' · ');

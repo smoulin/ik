@@ -260,6 +260,29 @@ public class TrackerPlugin extends Plugin {
         call.resolve();
     }
 
+    /**
+     * Identite de la coque installee.
+     *
+     * Le numero de version du code web ne distingue pas deux APK successifs :
+     * seule la version du paquet Android le fait. C'est elle qui dit si le
+     * telephone execute bien la livraison qu'on croit.
+     */
+    @PluginMethod
+    public void buildInfo(PluginCall call) {
+        JSObject result = new JSObject();
+        try {
+            android.content.pm.PackageInfo info = getContext()
+                .getPackageManager()
+                .getPackageInfo(getContext().getPackageName(), 0);
+            result.put("versionName", info.versionName);
+            result.put("versionCode", info.getLongVersionCode());
+        } catch (Exception error) {
+            result.put("versionName", "?");
+            result.put("versionCode", 0);
+        }
+        call.resolve(result);
+    }
+
     /* ---------------------------------------------------------------- */
     /* Journal de diagnostic                                             */
     /* ---------------------------------------------------------------- */
