@@ -279,18 +279,21 @@ button.ghost {
   justify-content: space-between;
 }
 
-/* Un bouton pleine largeur qui suit une rangée de boutons a besoin d'air :
+/* Un bouton pleine largeur et une rangée de boutons ont besoin d'air entre eux :
    collés, ils se lisent comme un seul groupe. */
 .button-row + button.wide,
+button.wide + .button-row,
 .button-row + .button-row {
   margin-top: 14px;
 }
 
 /* Rangée de boutons de même poids : colonnes égales plutôt qu'un flux qui
-   se replie dès que l'un des libellés s'allonge. */
+   se replie dès que l'un des libellés s'allonge. Le nombre de colonnes suit le
+   nombre de boutons — deux comme trois, sans avoir à le déclarer. */
 .button-row.equal {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -1459,6 +1462,54 @@ dialog h2 {
 .recorder-setup {
   padding: 18px;
   overflow-y: auto;
+}
+
+/*
+ * En-tete d'une boite modale : le titre, et la croix qui la ferme.
+ *
+ * Elle reste collee en haut pendant le defilement. C'est necessaire ici : le
+ * journal fait plusieurs ecrans, et une croix qui disparait au premier
+ * defilement ne ferme plus rien. Les marges negatives lui rendent la pleine
+ * largeur que le remplissage de la boite lui retire.
+ */
+.dialog-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -18px -18px 0;
+  padding: 18px 18px 10px;
+  background: var(--surface);
+}
+
+.dialog-head h2 {
+  margin: 0;
+}
+
+/*
+ * La touche Echap ferme deja la boite : la croix ne fait qu'exposer ce geste
+ * au doigt. 40 px de cote, pour rester atteignable sans viser.
+ */
+.dialog-close {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--brand-ink-soft);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.dialog-close:hover {
+  background: var(--gold-wash);
 }
 
 .recorder-setup h3 {

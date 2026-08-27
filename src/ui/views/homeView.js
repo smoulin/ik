@@ -28,12 +28,16 @@ import { computeTripAmounts } from '../../domain/mileage/engine.js';
 import { toKilometers } from '../../domain/tracks/trackDistance.js';
 import { formatKm, formatMoney } from '../../shared/format.js';
 
-export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
+export function createHomeView({ store, geo = null, onChanged = () => {}, onEditDraft }) {
   const list = byId('tracksList');
   const statusEl = byId('trackStatus');
   const badge = byId('homeBadge');
 
-  const importService = createTrackImportService({ trackRepository, favoritePlaceRepository });
+  const importService = createTrackImportService({
+    trackRepository,
+    favoritePlaceRepository,
+    geocodingService: geo?.geocodingService || null,
+  });
 
   /** Cartes ouvertes, pour ne pas les refermer à chaque rafraîchissement. */
   const expanded = new Set();
@@ -171,6 +175,35 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
     setHidden(badge, tracks.length === 0);
 
     render();
+    nameAnonymousEndpoints();
+  }
+
+  /**
+   * Donne une adresse aux extrémités qu'aucun lieu favori n'a nommées.
+   *
+   * En tâche de fond, après l'affichage : la liste doit apparaître tout de
+   * suite, même sans réseau. Une extrémité déjà nommée — ou dont le nommage a
+   * déjà échoué — n'est pas redemandée, donc cette passe ne coûte rien une fois
+   * les trajets connus.
+   */
+  function nameAnonymousEndpoints() {
+    const anonymous = tracks.filter(
+      (track) => needsName(track.start) || needsName(track.end),
+    );
+    if (!anonymous.length) return;
+
+    importService
+      .nameEndpoints(anonymous)
+      .then((named) => {
+        // `nameEndpoints` met à jour les traces déjà en mémoire : un simple
+        // réaffichage suffit, sans relire la base.
+        if (named) render();
+      })
+      .catch(() => {});
+  }
+
+  function needsName(endpoint) {
+    return Boolean(endpoint) && !endpoint.label && !endpoint.labelSource;
   }
 
   /**
@@ -274,9 +307,17 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
       : '';
     return el('div', { class: 'trip-endpoint' }, [
       el('span', { class: 'dot', text: letter }),
-      el('span', { text: endpoint?.label || 'Lieu inconnu' }),
+      // Le lieu, lui, est parfaitement connu : ce sont ses coordonnées. C'est
+      // son adresse qui manque — soit elle est en cours de résolution, soit
+      // aucun fournisseur ne sait la nommer.
+      el('span', { text: endpoint?.label || endpointFallback(endpoint) }),
       heure ? el('span', { class: 'meta', text: heure }) : null,
     ]);
+  }
+
+  function endpointFallback(endpoint) {
+    if (!endpoint) return 'Point inconnu';
+    return endpoint.labelSource === 'none' ? 'Adresse non trouvée' : 'Recherche de l’adresse…';
   }
 
   function formatPeriod(track) {
@@ -327,12 +368,15 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
       estimate,
       mapNode,
       el('div', { class: 'track-quality', text: qualityLabel(track) }),
-      el('div', { class: 'button-row' }, [
-        el('button', {
-          class: 'primary',
-          text: 'Valider ce trajet',
-          onClick: () => convert(track, selectedCompanyId),
-        }),
+      // L'action principale occupe toute la largeur ; les deux autres se
+      // partagent la suivante en parts égales. Sur un écran de téléphone, les
+      // trois côte à côte se repliaient au hasard des libellés.
+      el('button', {
+        class: 'primary wide',
+        text: 'Valider ce trajet',
+        onClick: () => convert(track, selectedCompanyId),
+      }),
+      el('div', { class: 'button-row equal' }, [
         el('button', { text: 'Compléter', onClick: () => editDraft(track, selectedCompanyId) }),
         el('button', { class: 'danger', text: 'Ignorer', onClick: () => ignore(track) }),
       ]),

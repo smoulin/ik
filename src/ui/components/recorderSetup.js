@@ -55,22 +55,70 @@ const STEPS = [
   },
 ];
 
+/**
+ * Boite modale qui se range vraiment.
+ *
+ * Le rangement ne peut pas dependre du seul evenement `close` : certaines
+ * WebView ne l'emettent pas — c'est verifiable, un `<dialog>` neuf n'en emet
+ * aucun dans le navigateur de test. La boite disparaitrait alors de l'ecran
+ * tout en restant dans le document, et l'appelant ne serait jamais prevenu :
+ * apres avoir accorde une autorisation, la page ne se rafraichirait pas.
+ *
+ * Tous les chemins de fermeture — croix, Echap, evenement natif — appellent
+ * donc le meme rangement, execute une seule fois.
+ */
+function createDialog(className, onClosed = () => {}) {
+  const dialog = el('dialog', { class: className });
+  let closed = false;
+
+  function finish() {
+    if (closed) return;
+    closed = true;
+    dialog.remove();
+    onClosed();
+  }
+
+  function close() {
+    if (dialog.open) dialog.close();
+    finish();
+  }
+
+  dialog.addEventListener('close', finish);
+  dialog.addEventListener('cancel', finish);
+  // Echap ferme la boite sans passer par JavaScript : ce guetteur assure le
+  // rangement meme quand l'evenement natif n'arrive pas.
+  dialog.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') finish();
+  });
+
+  return { dialog, close };
+}
+
+/**
+ * Titre d'une boite modale, et la croix qui la ferme.
+ *
+ * Un bouton « Fermer » en pied obligeait a faire defiler tout le journal pour
+ * ressortir de la boite. La croix reste visible en haut a droite, ou le geste
+ * est attendu.
+ */
+function dialogHead(title, close) {
+  return el('div', { class: 'dialog-head' }, [
+    el('h2', { text: title }),
+    el('button', {
+      class: 'dialog-close',
+      type: 'button',
+      text: '✕',
+      'aria-label': 'Fermer',
+      onClick: close,
+    }),
+  ]);
+}
+
 export async function openRecorderSetup({ onChanged = () => {} } = {}) {
-  const dialog = el('dialog', { class: 'recorder-setup' });
+  const { dialog, close } = createDialog('recorder-setup', onChanged);
   const body = el('div');
 
-  dialog.append(
-    el('h2', { text: 'Enregistrement automatique' }),
-    body,
-    el('div', { class: 'button-row' }, [
-      el('button', { text: 'Fermer', onClick: () => dialog.close() }),
-    ]),
-  );
-
-  dialog.addEventListener('close', () => {
-    dialog.remove();
-    onChanged();
-  });
+  dialog.append(dialogHead('Enregistrement automatique', close), body);
 
   document.body.append(dialog);
   dialog.showModal();
@@ -109,7 +157,7 @@ export async function openRecorderSetup({ onChanged = () => {} } = {}) {
           'c’est ici qu’on en trouve la raison.',
       }),
       el('pre', { class: 'diary', text: lastLines(diary.journal, 25) || 'Journal vide.' }),
-      el('div', { class: 'button-row' }, [
+      el('div', { class: 'button-row equal' }, [
         el('button', { text: 'Partager le journal', onClick: () => shareJournal(diary.journal) }),
         el('button', {
           text: 'Effacer',
@@ -174,8 +222,9 @@ export async function openRecorderSetup({ onChanged = () => {} } = {}) {
       return;
     }
 
-    const picker = el('dialog', { class: 'recorder-setup' }, [
-      el('h2', { text: 'Appareil du véhicule' }),
+    const { dialog: picker, close: closePicker } = createDialog('recorder-setup');
+    picker.append(
+      dialogHead('Appareil du véhicule', closePicker),
       el(
         'div',
         { class: 'device-list' },
@@ -185,18 +234,14 @@ export async function openRecorderSetup({ onChanged = () => {} } = {}) {
             onClick: async () => {
               await setVehicle(device);
               await note(`Vehicule choisi : ${device.name}`);
-              picker.close();
+              closePicker();
               await render();
             },
           }),
         ),
       ),
-      el('div', { class: 'button-row' }, [
-        el('button', { text: 'Annuler', type: 'button', onClick: () => picker.close() }),
-      ]),
-    ]);
+    );
 
-    picker.addEventListener('close', () => picker.remove());
     document.body.append(picker);
     picker.showModal();
   }
