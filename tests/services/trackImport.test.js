@@ -13,6 +13,7 @@ import {
   describeEndpoint,
   trackToTripDraft,
   PLACE_MATCH_RADIUS_M,
+  UnusableTrackError,
 } from '../../src/services/tracks/trackImportService.js';
 import { trackRepository, favoritePlaceRepository } from '../../src/data/repositories/index.js';
 
@@ -146,7 +147,10 @@ describe('importGpx', () => {
     expect(track.quality.durationSeconds).toBe(3300);
   });
 
-  it('refuse une trace sans déplacement', async () => {
+  // R17 — un contact mis puis coupé sans rouler. Réessayer n'y changera rien,
+  // d'où l'erreur typée : l'appelant peut écarter la trace au lieu de la rejouer
+  // et de l'afficher en rouge à chaque ouverture.
+  it('refuse une trace sans déplacement, définitivement', async () => {
     const immobile = `<gpx><trk><trkseg>
       <trkpt lat="45.1" lon="5.7"><time>2026-08-18T07:00:00Z</time></trkpt>
       <trkpt lat="45.100001" lon="5.700001"><time>2026-08-18T07:00:10Z</time></trkpt>
@@ -154,10 +158,16 @@ describe('importGpx', () => {
     await expect(service().importGpx({ name: 'x.gpx', text: immobile })).rejects.toThrow(
       /déplacement/i,
     );
+    await expect(
+      service().importGpx({ name: 'x.gpx', text: immobile }),
+    ).rejects.toBeInstanceOf(UnusableTrackError);
   });
 
-  it('refuse un fichier qui n’est pas un GPX', async () => {
+  it('refuse un fichier qui n’est pas un GPX, définitivement', async () => {
     await expect(service().importGpx({ name: 'x.txt', text: 'bonjour' })).rejects.toThrow(/GPX/i);
+    await expect(
+      service().importGpx({ name: 'x.txt', text: 'bonjour' }),
+    ).rejects.toBeInstanceOf(UnusableTrackError);
   });
 
   it('repère une trace déjà importée', async () => {
@@ -259,6 +269,87 @@ describe('nameEndpoints', () => {
 
     await expect(service.nameEndpoints([track])).resolves.toBe(0);
     expect(track.start.label).toBe('');
+  });
+});
+
+/**
+ * Rapprochement avec les favoris tels qu'ils sont maintenant.
+ *
+ * On enregistre son domicile en favori APRES avoir vu passer des trajets qui en
+ * partent : les traces deja la doivent suivre.
+ */
+describe('matchFavorites', () => {
+  const service = () => createTrackImportService({ trackRepository, favoritePlaceRepository });
+
+  // R19
+  it('renomme rétroactivement une extrémité quand un favori apparaît', async () => {
+    const s = service();
+    const track = await s.importGpx({ name: 't.gpx', text: GPX });
+    expect(track.start.label).toBe('');
+
+    await favoritePlaceRepository.save({
+      name: 'Maison',
+      address: { label: '358 Chemin de l’Étang, 38980 Châtenay' },
+      latitude: 45.316244,
+      longitude: 5.22936,
+    });
+
+    expect(await s.matchFavorites([track])).toBe(1);
+    expect(track.start.label).toBe('Maison');
+    expect(track.start.labelSource).toBe('favorite');
+
+    const stored = await trackRepository.get(track.id);
+    expect(stored.start.label).toBe('Maison');
+  });
+
+  // Un favori l'emporte sur une adresse deja trouvee : c'est un nom choisi.
+  it('remplace une adresse déjà résolue par le nom du favori', async () => {
+    const s = createTrackImportService({
+      trackRepository,
+      favoritePlaceRepository,
+      geocodingService: { describe: async () => ({ label: '12 Rue Quelconque', provider: 'ban' }) },
+    });
+    const track = await s.importGpx({ name: 't.gpx', text: GPX });
+    await s.nameEndpoints([track]);
+    expect(track.start.labelSource).toBe('address');
+
+    await favoritePlaceRepository.save({
+      name: 'Maison',
+      address: {},
+      latitude: 45.316244,
+      longitude: 5.22936,
+    });
+
+    await s.matchFavorites([track]);
+    expect(track.start.label).toBe('Maison');
+    expect(track.start.labelSource).toBe('favorite');
+  });
+
+  // R20
+  it('rend son anonymat à une extrémité dont le favori a disparu', async () => {
+    const place = await favoritePlaceRepository.save({
+      name: 'Maison',
+      address: {},
+      latitude: 45.316244,
+      longitude: 5.22936,
+    });
+    const s = service();
+    const track = await s.importGpx({ name: 't.gpx', text: GPX });
+    expect(track.start.label).toBe('Maison');
+
+    await favoritePlaceRepository.remove(place.id, { hard: true });
+
+    expect(await s.matchFavorites([track])).toBe(1);
+    expect(track.start.label).toBe('');
+    expect(track.start.placeId).toBeNull();
+    // Redevenue anonyme, donc éligible à une recherche d'adresse.
+    expect(track.start.labelSource).toBe('');
+  });
+
+  it('n’écrit rien quand rien n’a changé', async () => {
+    const s = service();
+    const track = await s.importGpx({ name: 't.gpx', text: GPX });
+    expect(await s.matchFavorites([track])).toBe(0);
   });
 });
 

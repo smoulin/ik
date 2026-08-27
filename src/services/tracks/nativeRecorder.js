@@ -118,14 +118,19 @@ export function stopRecording() {
  * d'erreur, elle reste disponible pour la tentative suivante plutot que d'etre
  * perdue. Un doublon est en revanche efface, puisque la trace est deja connue.
  *
+ * Une session dont le contenu ne donnera jamais un trajet — un contact mis puis
+ * coupe sans rouler — est en revanche effacee. La garder reviendrait a la
+ * retenter, et a la signaler en rouge, a chaque ouverture jusqu'a la fin des
+ * temps.
+ *
  * @param {object} handlers
  * @param {Function} handlers.importGpx     depuis `createTrackImportService`
  * @param {Function} handlers.isDuplicate   idem
  * @param {Function} handlers.discard       efface une trace en doublon
- * @returns {Promise<{imported: number, duplicates: number, problems: string[]}>}
+ * @returns {Promise<{imported: number, duplicates: number, unusable: number, problems: string[]}>}
  */
 export async function collectSessions({ importGpx, isDuplicate, discard }) {
-  const summary = { imported: 0, duplicates: 0, problems: [] };
+  const summary = { imported: 0, duplicates: 0, unusable: 0, problems: [] };
   if (!isRecorderAvailable()) return summary;
 
   const { sessions } = await Tracker.listSessions();
@@ -144,8 +149,14 @@ export async function collectSessions({ importGpx, isDuplicate, discard }) {
 
       await Tracker.deleteSession({ name: session.name });
     } catch (error) {
-      // La session reste sur le telephone : on reessaiera a la prochaine
-      // ouverture plutot que de perdre un trajet.
+      if (error?.name === 'UnusableTrackError') {
+        // Reessayer ne changera rien : le contenu est en cause.
+        await Tracker.deleteSession({ name: session.name });
+        summary.unusable += 1;
+        continue;
+      }
+      // Panne passagere : la session reste sur le telephone et sera reprise a
+      // la prochaine ouverture, plutot que de perdre un trajet.
       summary.problems.push(`${session.name} : ${error.message || error}`);
     }
   }
