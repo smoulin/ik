@@ -11,8 +11,8 @@ android {
         // APK differents sont indiscernables une fois installes — ce qui a
         // deja coute cinq jours d'enregistrements a chercher une panne dans
         // une version qui ne contenait tout simplement pas la fonction.
-        versionCode 4
-        versionName "M2c"
+        versionCode 5
+        versionName "M2d"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
