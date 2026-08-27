@@ -85,10 +85,17 @@ export function createHomeView({ store, geo = null, onChanged = () => {}, onEdit
 
       await refresh();
 
-      if (summary.imported) {
-        setStatus(`${summary.imported} trajet(s) enregistré(s) récupéré(s).`, 'good');
-      } else if (summary.problems.length) {
+      // L'ordre dit la gravité : un échec passager passe avant un compte-rendu.
+      if (summary.problems.length) {
         setStatus(summary.problems.join(' · '), 'bad');
+      } else if (summary.imported) {
+        setStatus(`${summary.imported} trajet(s) enregistré(s) récupéré(s).`, 'good');
+      } else if (summary.unusable) {
+        // Ni une réussite ni une panne : un contact mis puis coupé sans rouler.
+        setStatus(
+          `${summary.unusable} enregistrement(s) sans déplacement, écarté(s).`,
+          '',
+        );
       }
     } catch (error) {
       setStatus(`Récupération impossible : ${error.message || error}`, 'bad');
@@ -168,6 +175,10 @@ export function createHomeView({ store, geo = null, onChanged = () => {}, onEdit
     tracks = (await trackRepository.list())
       .filter((track) => track.status === 'pending')
       .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
+
+    // Les favoris ont pu changer depuis l'import : un domicile enregistré hier
+    // doit nommer les trajets d'avant-hier. Comparaison locale, sans réseau.
+    await importService.matchFavorites(tracks).catch(() => {});
 
     await refreshRecorderState();
 

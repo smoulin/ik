@@ -912,6 +912,15 @@ td.num {
   flex-shrink: 0;
 }
 
+/* L'heure ne se coupe jamais : « 10:4 » sur une ligne et « 7 » sur la suivante
+   ne se lit plus. C'est le libellé, de longueur variable, qui se replie —
+   depuis qu'il porte une adresse complète et non plus « Lieu inconnu ». */
+.trip-endpoint .meta {
+  flex: 0 0 auto;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
 .trip-figures {
   text-align: right;
   flex-shrink: 0;
