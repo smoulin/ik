@@ -140,6 +140,185 @@ describe('geocodage', () => {
   });
 });
 
+/**
+ * Sens inverse. Les extremites d'une trace GPS n'arrivent qu'en coordonnees :
+ * sans lui, elles resteraient anonymes dans la liste des trajets a valider.
+ */
+describe('geocodage inverse', () => {
+  const REVERSE_RESPONSE = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        geometry: { type: 'Point', coordinates: [5.1204, 45.2891] },
+        properties: { label: '70 Rue du Pont Neuf 38980 Viriville', distance: 14 },
+      },
+    ],
+  };
+
+  // R1
+  it('nomme un point releve par le GPS', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(REVERSE_RESPONSE));
+    const provider = createBanGeocodingProvider({ fetchImpl });
+
+    const result = await provider.reverse(45.2891, 5.1204);
+
+    const url = new URL(fetchImpl.mock.calls[0][0]);
+    expect(url.pathname).toBe('/reverse/');
+    expect(url.searchParams.get('lat')).toBe('45.2891');
+    expect(url.searchParams.get('lon')).toBe('5.1204');
+    // Aucune cle d'API ne doit transiter (§4).
+    expect(url.searchParams.has('key')).toBe(false);
+
+    expect(result.label).toBe('70 Rue du Pont Neuf 38980 Viriville');
+    expect(result.distanceMeters).toBe(14);
+    expect(result.provider).toBe('ban');
+  });
+
+  // R2 — la BAN ne couvre que la France : hors de ses limites, liste vide.
+  it('signale un point hors couverture sans le confondre avec une panne', async () => {
+    const provider = createBanGeocodingProvider({
+      fetchImpl: async () => jsonResponse({ features: [] }),
+    });
+    await expect(provider.reverse(51.5, -0.12)).rejects.toMatchObject({ kind: 'not-found' });
+  });
+
+  // R3
+  it('signale un service injoignable', async () => {
+    const provider = createBanGeocodingProvider({
+      fetchImpl: async () => {
+        throw new Error('offline');
+      },
+    });
+    await expect(provider.reverse(45.2891, 5.1204)).rejects.toMatchObject({
+      kind: 'network',
+      provider: 'ban',
+    });
+  });
+
+  it('refuse des coordonnees invalides sans appeler le reseau', async () => {
+    const fetchImpl = vi.fn();
+    const provider = createBanGeocodingProvider({ fetchImpl });
+
+    await expect(provider.reverse(NaN, 5.12)).rejects.toMatchObject({ kind: 'not-found' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe('createGeocodingService — describe()', () => {
+  /** Cache en memoire, avec la meme interface que le depot persistant. */
+  function memoryCache() {
+    const entries = new Map();
+    return {
+      get: async (key) => entries.get(key) || null,
+      set: async (key, value) => entries.set(key, value),
+    };
+  }
+
+  function countingProvider(label = '70 Rue du Pont Neuf 38980 Viriville') {
+    const reverse = vi.fn(async (latitude, longitude) => ({
+      latitude,
+      longitude,
+      label: `${label}`,
+      provider: 'ban',
+    }));
+    return { provider: { id: 'ban', reverse }, reverse };
+  }
+
+  // R4
+  it('sert le second appel depuis le cache', async () => {
+    const { provider, reverse } = countingProvider();
+    const service = createGeocodingService({
+      providers: [provider],
+      cacheRepository: memoryCache(),
+    });
+
+    await service.describe({ latitude: 45.2891, longitude: 5.1204 });
+    const second = await service.describe({ latitude: 45.2891, longitude: 5.1204 });
+
+    expect(reverse).toHaveBeenCalledTimes(1);
+    expect(second.source).toBe('cache');
+  });
+
+  // R5 — deux releves au meme endroit doivent tomber sur la meme cle, sinon le
+  // cache ne servirait a rien : le GPS ne rend jamais deux fois le meme point.
+  //
+  // La grille d'arrondi ne le garantit qu'a l'interieur d'une meme case : deux
+  // points voisins separes par une frontiere coutent une requete de plus. Ce
+  // test verifie le cas courant, pas une propriete universelle.
+  it('regroupe deux relevés voisins tombant dans la même case', async () => {
+    const { provider, reverse } = countingProvider();
+    const service = createGeocodingService({
+      providers: [provider],
+      cacheRepository: memoryCache(),
+    });
+
+    await service.describe({ latitude: 45.28911, longitude: 5.12041 });
+    await service.describe({ latitude: 45.28914, longitude: 5.12044 });
+
+    expect(reverse).toHaveBeenCalledTimes(1);
+  });
+
+  // R6
+  it('distingue deux lieux réellement différents', async () => {
+    const { provider, reverse } = countingProvider();
+    const service = createGeocodingService({
+      providers: [provider],
+      cacheRepository: memoryCache(),
+    });
+
+    await service.describe({ latitude: 45.2891, longitude: 5.1204 });
+    await service.describe({ latitude: 45.2909, longitude: 5.1204 });
+
+    expect(reverse).toHaveBeenCalledTimes(2);
+  });
+
+  // Le signe doit survivre a la normalisation des cles, qui supprime la
+  // ponctuation : sans quoi Brest et un point d'Isere partageraient une entree.
+  it('ne confond pas une longitude négative avec son opposée', async () => {
+    const { provider, reverse } = countingProvider();
+    const service = createGeocodingService({
+      providers: [provider],
+      cacheRepository: memoryCache(),
+    });
+
+    await service.describe({ latitude: 48.39, longitude: -4.486 });
+    await service.describe({ latitude: 48.39, longitude: 4.486 });
+
+    expect(reverse).toHaveBeenCalledTimes(2);
+  });
+
+  it('saute un fournisseur qui ne sait pas faire l’inverse', async () => {
+    const { provider, reverse } = countingProvider();
+    const service = createGeocodingService({
+      providers: [{ id: 'sans-reverse', geocode: vi.fn() }, provider],
+      cacheRepository: null,
+    });
+
+    const result = await service.describe({ latitude: 45.2891, longitude: 5.1204 });
+
+    expect(reverse).toHaveBeenCalledTimes(1);
+    expect(result.provider).toBe('ban');
+  });
+
+  it('remonte une erreur typée quand aucun fournisseur ne répond', async () => {
+    const service = createGeocodingService({
+      providers: [
+        {
+          id: 'ban',
+          reverse: async () => {
+            throw new GeoProviderError('injoignable', { provider: 'ban' });
+          },
+        },
+      ],
+      cacheRepository: null,
+    });
+
+    await expect(service.describe({ latitude: 45.2891, longitude: 5.1204 })).rejects.toBeInstanceOf(
+      GeoProviderError,
+    );
+  });
+});
+
 describe('createGeocodingService', () => {
   it('utilise les coordonnees deja connues sans appeler le reseau', async () => {
     const geocode = vi.fn();
