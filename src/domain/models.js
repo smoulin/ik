@@ -312,6 +312,9 @@ export function createFavoritePlace(input = {}) {
 /** Etats d'une trace importee. */
 export const TRACK_STATUSES = ['pending', 'converted', 'ignored'];
 
+/** Origine du libelle d'une extremite de trace. */
+export const TRACK_LABEL_SOURCES = ['favorite', 'address', 'none'];
+
 /**
  * Trajet enregistre par le GPS, avant d'etre transforme en trajet declarable.
  *
@@ -328,8 +331,8 @@ export const TRACK_STATUSES = ['pending', 'converted', 'ignored'];
  * @property {number} distanceMeters   distance retenue, apres filtrage
  * @property {number} rawDistanceMeters distance brute, avant filtrage
  * @property {object} quality       compteurs de points retenus et ecartes
- * @property {{latitude:number,longitude:number,label:string,placeId:string|null}} start
- * @property {{latitude:number,longitude:number,label:string,placeId:string|null}} end
+ * @property {{latitude:number,longitude:number,label:string,placeId:string|null,labelSource:string}} start
+ * @property {{latitude:number,longitude:number,label:string,placeId:string|null,labelSource:string}} end
  * @property {Array<[number,number]>} geometry
  * @property {string} status        'pending' | 'converted' | 'ignored'
  * @property {string|null} tripId   trajet cree a partir de cette trace
@@ -365,6 +368,10 @@ function trackEndpoint(value) {
     longitude,
     label: str(value.label),
     placeId: value.placeId ? str(value.placeId) : null,
+    // D'ou vient le libelle : un lieu favori, une adresse retrouvee, ou rien.
+    // « none » retient un echec : sans lui, un point qu'aucun fournisseur ne
+    // sait nommer serait redemande a chaque ouverture de l'application.
+    labelSource: TRACK_LABEL_SOURCES.includes(value.labelSource) ? value.labelSource : '',
   };
 }
 
