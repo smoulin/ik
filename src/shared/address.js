@@ -40,10 +40,15 @@ export function splitFrenchAddress(label) {
 /**
  * Complete une suggestion dont le code postal ou la ville manquent, en les
  * deduisant du libelle complet. Ne remplace jamais une valeur deja fournie.
+ *
+ * Et surtout, dans tous les cas : `label` sert a remplir le champ « adresse »,
+ * il ne doit donc jamais porter le code postal ni la ville, qui ont leurs
+ * propres champs. Une adresse deja utilisee arrive avec un libelle complet ET
+ * une localite connue — sortir tot dans ce cas laissait la localite dans le
+ * champ « adresse », et l'enregistrement la repetait ensuite.
  */
 export function completeSuggestionLocality(suggestion) {
   if (!suggestion) return suggestion;
-  if (suggestion.postalCode && suggestion.city) return suggestion;
 
   const source = suggestion.fullLabel || suggestion.label || '';
   const parsed = splitFrenchAddress(source);
@@ -52,13 +57,18 @@ export function completeSuggestionLocality(suggestion) {
   const postalCode = suggestion.postalCode || parsed.postalCode;
   const city = suggestion.city || parsed.city;
 
+  // Un libelle qui n'est pas l'adresse — le nom d'un lieu favori, par exemple —
+  // n'a pas a etre remplace par la voie extraite d'une autre chaine.
+  const labelCarriesLocality = splitFrenchAddress(suggestion.label || '').postalCode !== '';
+  const label = labelCarriesLocality
+    ? splitFrenchAddress(suggestion.label).line1 || suggestion.label
+    : suggestion.label || parsed.line1;
+
   return {
     ...suggestion,
     postalCode,
     city,
-    // `label` sert a remplir le champ « adresse » : il ne doit pas repeter
-    // le code postal et la ville, qui ont leurs propres champs.
-    label: parsed.line1 || suggestion.label,
+    label,
     // La ligne secondaire doit rester renseignee : sans elle, la suggestion
     // parait tronquee et l'utilisateur hesite a la choisir.
     secondary: suggestion.secondary || [postalCode, city].filter(Boolean).join(' '),

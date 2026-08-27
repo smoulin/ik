@@ -88,7 +88,42 @@ describe('completeSuggestionLocality', () => {
       postalCode: '38000',
       city: 'Grenoble',
     };
-    expect(completeSuggestionLocality(suggestion)).toBe(suggestion);
+    const completee = completeSuggestionLocality(suggestion);
+
+    expect(completee.postalCode).toBe('38000');
+    expect(completee.city).toBe('Grenoble');
+    // La voie ne portait pas la localite : elle reste telle quelle.
+    expect(completee.label).toBe('12 Cours Jean Jaurès');
+  });
+
+  /*
+   * Le cas qui produisait « 358 Chemin de l'Étang 38980 Châtenay, 38980
+   * Châtenay » : une adresse deja utilisee arrive avec un libelle complet ET
+   * une localite connue. Le champ « adresse » recevait le tout, et
+   * l'enregistrement y rajoutait la localite une seconde fois.
+   */
+  it('retire la localite d’un libelle complet meme quand elle est deja connue', () => {
+    const completee = completeSuggestionLocality({
+      label: '358 Chemin de l’Étang 38980 Châtenay',
+      fullLabel: '358 Chemin de l’Étang 38980 Châtenay',
+      postalCode: '38980',
+      city: 'Châtenay',
+    });
+
+    expect(completee.label).toBe('358 Chemin de l’Étang');
+    expect(completee.postalCode).toBe('38980');
+    expect(completee.city).toBe('Châtenay');
+  });
+
+  it('laisse intact le nom d’un lieu favori', () => {
+    const completee = completeSuggestionLocality({
+      label: 'Maison',
+      fullLabel: '358 Chemin de l’Étang 38980 Châtenay',
+      postalCode: '38980',
+      city: 'Châtenay',
+    });
+
+    expect(completee.label).toBe('Maison');
   });
 
   it('laisse intacte une suggestion sans code postal identifiable', () => {

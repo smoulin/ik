@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase } from '../helpers/db.js';
-import { composeAddressLabel, formatAddressLines } from '../../src/domain/models.js';
+import { composeAddressLabel, formatAddressLines, createAddress } from '../../src/domain/models.js';
 import {
   companyRepository,
   vehicleRepository,
@@ -32,6 +32,54 @@ describe('composition des adresses', () => {
     expect(composeAddressLabel({ line1: '12 rue Exemple' })).toBe('12 rue Exemple');
     expect(composeAddressLabel({ postalCode: '38000', city: 'Grenoble' })).toBe('38000 Grenoble');
     expect(composeAddressLabel({})).toBe('');
+  });
+
+  // La voie reprise d'un libelle complet porte deja la localite : l'ajouter une
+  // seconde fois donnait « … 38980 Châtenay, 38980 Châtenay ».
+  it('ne répète pas une localité déjà présente dans la voie', () => {
+    expect(
+      composeAddressLabel({
+        line1: '358 Chemin de l’Étang 38980 Châtenay',
+        postalCode: '38980',
+        city: 'Châtenay',
+      }),
+    ).toBe('358 Chemin de l’Étang 38980 Châtenay');
+  });
+
+  it('ignore la casse et les accents pour juger de la répétition', () => {
+    expect(
+      composeAddressLabel({ line1: '12 rue Exemple 38000 GRENOBLE', postalCode: '38000', city: 'Grenoble' }),
+    ).toBe('12 rue Exemple 38000 GRENOBLE');
+  });
+
+  it('ajoute la localité quand la voie porte une AUTRE commune', () => {
+    expect(
+      composeAddressLabel({ line1: '12 rue Exemple 38000 Grenoble', postalCode: '38980', city: 'Châtenay' }),
+    ).toBe('12 rue Exemple 38000 Grenoble, 38980 Châtenay');
+  });
+
+  // Normalisation a l'enregistrement : elle repare les fiches deja ecrites.
+  it('retire de la voie la localité qui a ses propres champs', () => {
+    const address = createAddress({
+      line1: '358 Chemin de l’Étang 38980 Châtenay',
+      postalCode: '38980',
+      city: 'Châtenay',
+    });
+    expect(address.line1).toBe('358 Chemin de l’Étang');
+  });
+
+  it('laisse la voie intacte quand la commune diffère', () => {
+    const address = createAddress({
+      line1: '12 rue Exemple 38000 Grenoble',
+      postalCode: '38980',
+      city: 'Châtenay',
+    });
+    expect(address.line1).toBe('12 rue Exemple 38000 Grenoble');
+  });
+
+  it('ne vide jamais la voie', () => {
+    const address = createAddress({ line1: '38980 Châtenay', postalCode: '38980', city: 'Châtenay' });
+    expect(address.line1).toBe('38980 Châtenay');
   });
 
   it('produit les lignes du rapport dans l’ordre postal francais', () => {

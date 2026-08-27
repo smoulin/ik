@@ -10,6 +10,8 @@
  */
 
 import { uid, nowIso } from './ids.js';
+import { normalizeText } from '../shared/normalize.js';
+import { splitFrenchAddress } from '../shared/address.js';
 
 /** Version du schema de donnees applicatif (independante de la version de l'app). */
 export const SCHEMA_VERSION = 2;
@@ -73,16 +75,42 @@ export const ROUTE_PREFERENCE_LABELS = {
 
 /** @returns {Address} */
 export function createAddress(input = {}) {
+  const postalCode = str(input.postalCode);
+  const city = str(input.city);
+
   return {
     label: str(input.label),
-    line1: str(input.line1),
+    // La voie ne porte pas la localite : celle-ci a ses propres champs. Une
+    // adresse reprise d'un libelle complet arrive pourtant avec les deux
+    // collees. Normaliser ici repare l'enregistrement au prochain
+    // enregistrement, au lieu de laisser la repetition s'installer.
+    line1: withoutLocality(str(input.line1), postalCode, city),
     line2: str(input.line2),
-    postalCode: str(input.postalCode),
-    city: str(input.city),
+    postalCode,
+    city,
     country: str(input.country) || 'FR',
     latitude: num(input.latitude),
     longitude: num(input.longitude),
   };
+}
+
+/**
+ * Retire la localite finale d'une voie, quand elle est deja connue par ailleurs.
+ *
+ * Le decoupage est confie a `splitFrenchAddress`, qui travaille sur la chaine
+ * telle qu'elle est ecrite. Comparer des chaines normalisees pour couper
+ * ensuite la chaine brute donnerait un decalage des que la ponctuation ou les
+ * espaces different.
+ */
+function withoutLocality(line, postalCode, city) {
+  if (!line || !postalCode) return line;
+
+  const parsed = splitFrenchAddress(line);
+  if (parsed.postalCode !== postalCode) return line;
+  if (city && normalizeText(parsed.city) !== normalizeText(city)) return line;
+
+  // Une voie qui se reduirait a rien n'en etait pas une : on garde l'original.
+  return parsed.line1 || line;
 }
 
 /** Une adresse est consideree vide si elle n'a ni libelle ni ville. */
@@ -115,13 +143,27 @@ export function formatAddressOneLine(address) {
  * Compose le libelle complet a partir de champs saisis separement.
  * Le code postal et la ville forment UN bloc separe par une espace
  * (« 12 rue Exemple, 38000 Grenoble »), jamais par une virgule.
+ *
+ * La voie peut deja se terminer par la localite — c'est le cas quand elle a
+ * ete reprise d'un libelle complet, par exemple une adresse deja utilisee.
+ * L'ajouter alors une seconde fois donnait « 358 Chemin de l'Etang 38980
+ * Chatenay, 38980 Chatenay ».
  */
 export function composeAddressLabel({ line1 = '', line2 = '', postalCode = '', city = '' } = {}) {
   const cityLine = [postalCode, city].map((v) => String(v || '').trim()).filter(Boolean).join(' ');
-  return [line1, line2, cityLine]
-    .map((v) => String(v || '').trim())
-    .filter(Boolean)
-    .join(', ');
+  const parts = [line1, line2].map((v) => String(v || '').trim()).filter(Boolean);
+  const last = parts[parts.length - 1] || '';
+
+  if (cityLine && !endsWithLocality(last, cityLine)) parts.push(cityLine);
+
+  return parts.join(', ');
+}
+
+/** Vrai si le texte se termine deja par cette localite, ponctuation comprise. */
+function endsWithLocality(text, cityLine) {
+  const haystack = normalizeText(text);
+  const needle = normalizeText(cityLine);
+  return Boolean(needle) && haystack.endsWith(needle);
 }
 
 export function hasCoordinates(address) {
