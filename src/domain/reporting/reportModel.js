@@ -17,7 +17,7 @@ import {
 import {
   computeTripAmounts,
   calculationModeLabel,
-  scaleYearForCompany,
+
   IK_ACCUMULATION_SCOPE,
 } from '../mileage/engine.js';
 import { CALCULATION_MODES } from '../models.js';
@@ -94,6 +94,10 @@ export function buildReport({
       km: Number(trip.km) || 0,
       amount: Number(computed?.amount) || 0,
       rateInfo: computed?.rateInfo || '',
+      // Le bareme depend de la date du trajet : deux lignes d'un meme rapport
+      // peuvent donc relever de deux annees differentes.
+      scaleYear: computed?.scaleYear ?? null,
+      scaleProvisional: Boolean(computed?.scaleProvisional),
     };
   });
 
@@ -294,12 +298,24 @@ function buildCalculationBlock(company, lines, vehicleById) {
 
   // Le taux BIC depend du vehicule : on ne le mentionne que s'il n'y en a qu'un.
   const singleVehicle = usedVehicles.length === 1 ? usedVehicles[0] : null;
+  const years = scaleYearsOf(lines);
 
   return {
     mode: company?.calculationMode || 'none',
-    label: calculationModeLabel(company, singleVehicle),
-    scaleYear: scaleYearForCompany(company),
+    // Le libelle suit l'annee des trajets. A cheval sur deux annees, aucune ne
+    // peut representer l'autre : on ne nomme alors pas de bareme unique.
+    label: calculationModeLabel(company, singleVehicle, years.length === 1 ? years[0] : undefined),
+    scaleYear: years.length === 1 ? years[0] : null,
+    scaleYears: years,
+    scaleProvisional: lines.some((line) => line.scaleProvisional),
   };
+}
+
+/** Annees de bareme reellement representees, dans l'ordre. */
+function scaleYearsOf(lines) {
+  return [...new Set(lines.map((line) => line.scaleYear).filter((year) => year !== null))].sort(
+    (a, b) => a - b,
+  );
 }
 
 /**
@@ -316,12 +332,16 @@ function buildCalculationsByCompany(lines, companyById, vehicleById) {
       ...new Set(lines.filter((l) => l.companyId === line.companyId).map((l) => l.vehicleId)),
     ];
     const singleVehicle = vehicles.length === 1 ? vehicleById.get(vehicles[0]) : null;
+    const companyLines = lines.filter((l) => l.companyId === line.companyId);
+    const years = scaleYearsOf(companyLines);
 
     seen.set(line.companyId, {
       companyId: line.companyId,
       companyName: company?.name || 'Structure supprimée',
-      label: calculationModeLabel(company, singleVehicle),
-      scaleYear: scaleYearForCompany(company),
+      label: calculationModeLabel(company, singleVehicle, years.length === 1 ? years[0] : undefined),
+      scaleYear: years.length === 1 ? years[0] : null,
+      scaleYears: years,
+      scaleProvisional: companyLines.some((l) => l.scaleProvisional),
     });
   }
 

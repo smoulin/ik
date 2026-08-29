@@ -125,12 +125,44 @@ describe('perimetre du cumul annuel', () => {
 
 describe('autres modes de calcul', () => {
   it('applique le taux du bareme carburant BIC', () => {
-    const t = trip({ id: 't', companyId: 'c3', km: 200 });
+    const t = trip({ id: 't', companyId: 'c3', km: 200, date: '2025-03-01' });
     const result = computeTripAmounts([t], context).get('t');
-    // 5 CV gazole -> 0,110 €/km
+    // 5 CV gazole, depenses 2025 -> 0,110 €/km
     expect(result.amount).toBeCloseTo(22, 6);
     // Taux affiche a la francaise, virgule comprise.
     expect(result.rateInfo).toBe('0,110 €/km');
+    expect(result.scaleProvisional).toBe(false);
+  });
+
+  /*
+   * B13 — contrairement au bareme kilometrique, inchange depuis 2022, le bareme
+   * carburant est republie chaque annee et baisse. L'annee du trajet doit donc
+   * reellement changer le montant.
+   */
+  it('valorise un trajet BIC au taux de SON annee', () => {
+    const context2 = context;
+    const en2023 = computeTripAmounts(
+      [trip({ id: 'a', companyId: 'c3', km: 200, date: '2023-05-10' })],
+      context2,
+    ).get('a');
+    const en2024 = computeTripAmounts(
+      [trip({ id: 'b', companyId: 'c3', km: 200, date: '2024-05-10' })],
+      context2,
+    ).get('b');
+
+    expect(en2023.rate).toBe(0.122);
+    expect(en2024.rate).toBe(0.116);
+    expect(en2023.amount).toBeGreaterThan(en2024.amount);
+  });
+
+  // B9 — le bareme de l'annee en cours ne parait qu'au printemps suivant.
+  it('signale un barème provisoire pour l’année en cours', () => {
+    const t = trip({ id: 't', companyId: 'c3', km: 200, date: '2026-03-01' });
+    const result = computeTripAmounts([t], context).get('t');
+    expect(result.scaleProvisional).toBe(true);
+    expect(result.rateInfo).toContain('provisoire');
+    // Le montant est calcule malgre tout : refuser serait pire.
+    expect(result.amount).toBeGreaterThan(0);
   });
 
   it('applique le taux personnalise de la structure', () => {

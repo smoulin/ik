@@ -187,8 +187,22 @@ function buildFooterInfo(report) {
     );
   } else {
     rows.push(infoRow('Méthode de calcul', report.calculation.label));
-    if (report.calculation.scaleYear) {
-      rows.push(infoRow('Année du barème', String(report.calculation.scaleYear)));
+
+    // Un rapport à cheval sur deux années relève de deux barèmes : en annoncer
+    // un seul serait faux.
+    const years = report.calculation.scaleYears || [];
+    if (years.length) {
+      rows.push(infoRow(years.length > 1 ? 'Années du barème' : 'Année du barème', years.join(' et ')));
+    }
+
+    if (report.calculation.scaleProvisional) {
+      rows.push(
+        infoRow(
+          'Réserve',
+          'Barème provisoire : celui de l’année des déplacements n’est pas encore publié. ' +
+            'Rééditer cet état si le texte définitif modifie les taux.',
+        ),
+      );
     }
   }
 

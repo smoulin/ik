@@ -130,7 +130,10 @@ export function createReportsView({ store, appVersion }) {
       : [
           report.period.label,
           `Méthode : ${report.calculation.label}`,
-          report.calculation.scaleYear ? `Barème ${report.calculation.scaleYear}` : null,
+          // Plusieurs années possibles : le barème suit la date de chaque trajet.
+          report.calculation.scaleYears?.length
+            ? `Barème ${report.calculation.scaleYears.join(' et ')}`
+            : null,
         ]
           .filter(Boolean)
           .join(' · ');

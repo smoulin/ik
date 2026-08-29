@@ -7,15 +7,14 @@
  */
 
 import { CALCULATION_MODES } from '../models.js';
-import { annualIkAmount, ikBracketLabel, getIkScale, normalizeCv } from './ikScale.js';
-import { bicRate, getBicScale } from './bicScale.js';
+import { annualIkAmount, ikBracketLabel, resolveIkScale, normalizeCv } from './ikScale.js';
+import { bicRate, resolveBicScale } from './bicScale.js';
 import {
   customAnnualAmount,
   customBracketLabel,
   describeCustomScale,
   normalizeCustomScale,
 } from './customScale.js';
-import { CURRENT_IK_SCALE_YEAR, CURRENT_BIC_SCALE_YEAR } from './scales.js';
 import { formatRate } from '../../shared/format.js';
 
 /**
@@ -71,6 +70,8 @@ export function sortTripsForAccumulation(trips) {
  * @property {string} rateInfo      texte court affiche dans les listes
  * @property {string} method        libelle de la methode de calcul
  * @property {number|null} scaleYear annee du bareme applique
+ * @property {boolean} scaleProvisional vrai quand l'annee du trajet n'a pas
+ *   encore de bareme publie : le dernier connu a servi
  * @property {number|null} rate      taux unitaire quand il y en a un
  */
 
@@ -100,40 +101,51 @@ export function computeTripAmounts(trips, { companies = [], vehicles = [], scope
     const afterKm = beforeKm + km;
     accumulated.set(key, afterKm);
 
-    results.set(trip.id, computeOne({ company, vehicle, km, beforeKm, afterKm }));
+    // L'annee du trajet choisit le bareme : un trajet de 2024 se valorise au
+    // bareme 2024, meme saisi aujourd'hui. Elle etait deja calculee pour le
+    // cumul annuel, mais n'etait pas transmise — d'ou des trajets passes
+    // valorises au dernier bareme connu.
+    results.set(
+      trip.id,
+      computeOne({ company, vehicle, km, beforeKm, afterKm, year: tripYear(trip) }),
+    );
   }
 
   return results;
 }
 
-function computeOne({ company, vehicle, km, beforeKm, afterKm }) {
+function computeOne({ company, vehicle, km, beforeKm, afterKm, year }) {
   const base = { km, beforeKm, afterKm };
 
   switch (company?.calculationMode) {
     case CALCULATION_MODES.IK: {
+      const { scale, appliedYear, provisional } = resolveIkScale(year);
       // Montant marginal : le franchissement d'une tranche est gere naturellement.
-      const amount = annualIkAmount(afterKm, vehicle) - annualIkAmount(beforeKm, vehicle);
-      const scale = getIkScale();
+      const amount =
+        annualIkAmount(afterKm, vehicle, appliedYear) -
+        annualIkAmount(beforeKm, vehicle, appliedYear);
       return {
         ...base,
         amount,
         rate: null,
-        rateInfo: `${scale.label} · ${ikBracketLabel(afterKm)}`,
-        method: `${scale.label} (cumul annuel, ${normalizeCv(vehicle?.cv)} CV${vehicle?.electric ? ' électrique' : ''})`,
-        scaleYear: scale.year,
+        rateInfo: `${scale.label} · ${ikBracketLabel(afterKm)}${provisionalSuffix(provisional)}`,
+        method: `${scale.label} (cumul annuel, ${normalizeCv(vehicle?.cv)} CV${vehicle?.electric ? ' électrique' : ''})${provisionalSuffix(provisional)}`,
+        scaleYear: appliedYear,
+        scaleProvisional: provisional,
       };
     }
 
     case CALCULATION_MODES.BIC: {
-      const rate = bicRate(vehicle);
-      const scale = getBicScale();
+      const { scale, appliedYear, provisional } = resolveBicScale(year);
+      const rate = bicRate(vehicle, appliedYear);
       return {
         ...base,
         amount: km * rate,
         rate,
-        rateInfo: formatRate(rate),
-        method: `${scale.label} (${formatRate(rate)})`,
-        scaleYear: scale.year,
+        rateInfo: `${formatRate(rate)}${provisionalSuffix(provisional)}`,
+        method: `${scale.label} (${formatRate(rate)})${provisionalSuffix(provisional)}`,
+        scaleYear: appliedYear,
+        scaleProvisional: provisional,
       };
     }
 
@@ -146,6 +158,7 @@ function computeOne({ company, vehicle, km, beforeKm, afterKm }) {
         rateInfo: formatRate(rate),
         method: `Taux personnalisé (${formatRate(rate)})`,
         scaleYear: null,
+        scaleProvisional: false,
       };
     }
 
@@ -161,6 +174,7 @@ function computeOne({ company, vehicle, km, beforeKm, afterKm }) {
         rateInfo: `${scale.label} · ${customBracketLabel(afterKm, scale)}`,
         method: `${scale.label} (cumul annuel — ${describeCustomScale(scale)})`,
         scaleYear: null,
+        scaleProvisional: false,
       };
     }
 
@@ -172,6 +186,7 @@ function computeOne({ company, vehicle, km, beforeKm, afterKm }) {
         rateInfo: '',
         method: 'Aucun remboursement',
         scaleYear: null,
+        scaleProvisional: false,
       };
   }
 }
@@ -180,15 +195,21 @@ function computeOne({ company, vehicle, km, beforeKm, afterKm }) {
  * Libelle du mode de calcul d'une structure, hors contexte d'un trajet.
  * Le vehicule est facultatif : sans lui, on n'affiche pas de taux BIC — la v0.1.1
  * utilisait arbitrairement le premier vehicule enregistre, ce qui etait trompeur.
+ *
+ * `year` est l'annee des deplacements decrits. Sans elle, le libelle annoncerait
+ * le dernier bareme connu pour des trajets qui n'en relevent pas.
  */
-export function calculationModeLabel(company, vehicle = null) {
+export function calculationModeLabel(company, vehicle = null, year = undefined) {
   switch (company?.calculationMode) {
-    case CALCULATION_MODES.IK:
-      return getIkScale().label;
+    case CALCULATION_MODES.IK: {
+      const { scale, provisional } = resolveIkScale(year);
+      return `${scale.label}${provisionalSuffix(provisional)}`;
+    }
     case CALCULATION_MODES.BIC: {
-      const scale = getBicScale();
-      if (!vehicle) return `${scale.label} (taux selon le véhicule)`;
-      return `${scale.label} (${formatRate(bicRate(vehicle))})`;
+      const { scale, appliedYear, provisional } = resolveBicScale(year);
+      const suffix = provisionalSuffix(provisional);
+      if (!vehicle) return `${scale.label} (taux selon le véhicule)${suffix}`;
+      return `${scale.label} (${formatRate(bicRate(vehicle, appliedYear))})${suffix}`;
     }
     case CALCULATION_MODES.CUSTOM: {
       const scale = normalizeCustomScale(company?.calculationSettings?.customScale);
@@ -203,16 +224,16 @@ export function calculationModeLabel(company, vehicle = null) {
   }
 }
 
-/** Annee du bareme utilise par une structure, pour l'en-tete des rapports. */
-export function scaleYearForCompany(company) {
-  switch (company?.calculationMode) {
-    case CALCULATION_MODES.IK:
-      return CURRENT_IK_SCALE_YEAR;
-    case CALCULATION_MODES.BIC:
-      return CURRENT_BIC_SCALE_YEAR;
-    default:
-      return null;
-  }
+/**
+ * Mention accolee a un bareme qui n'est pas celui de l'annee demandee.
+ *
+ * Le cas courant est l'annee en cours : son bareme ne parait qu'au printemps
+ * suivant. Le montant est calcule avec le dernier connu, ce qui est la pratique,
+ * mais le rapport doit le dire — sinon rien ne rappelle qu'il faudra le
+ * reediter si le nouveau texte change les taux.
+ */
+function provisionalSuffix(provisional) {
+  return provisional ? ' · barème provisoire' : '';
 }
 
 function indexById(items) {

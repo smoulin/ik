@@ -7,28 +7,64 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { annualIkAmount, normalizeCv, getIkCoefficients } from '../../src/domain/mileage/ikScale.js';
-import { bicRate, bicCvGroup } from '../../src/domain/mileage/bicScale.js';
+import {
+  annualIkAmount,
+  normalizeCv,
+  getIkCoefficients,
+  resolveIkScale,
+} from '../../src/domain/mileage/ikScale.js';
+import { bicRate, bicCvGroup, resolveBicScale } from '../../src/domain/mileage/bicScale.js';
 import { IK_SCALES, BIC_FUEL_SCALES } from '../../src/domain/mileage/scales.js';
 
 const thermal5cv = { cv: 5, electric: false, fuel: 'diesel' };
 const electric5cv = { cv: 5, electric: true, fuel: 'petrol' };
 
 describe('bareme kilometrique — valeurs officielles', () => {
-  it('conserve les coefficients thermiques de la v0.1.1', () => {
-    expect(IK_SCALES[2026].thermal[3]).toEqual({ a: 0.529, b: 0.316, c: 1065, d: 0.37 });
-    expect(IK_SCALES[2026].thermal[4]).toEqual({ a: 0.606, b: 0.34, c: 1330, d: 0.407 });
-    expect(IK_SCALES[2026].thermal[5]).toEqual({ a: 0.636, b: 0.357, c: 1395, d: 0.427 });
-    expect(IK_SCALES[2026].thermal[6]).toEqual({ a: 0.665, b: 0.374, c: 1457, d: 0.447 });
-    expect(IK_SCALES[2026].thermal[7]).toEqual({ a: 0.697, b: 0.394, c: 1515, d: 0.47 });
+  // B3 — arrete du 27 mars 2023, transcription exacte.
+  it('conserve les coefficients thermiques de l’arrêté du 27 mars 2023', () => {
+    expect(IK_SCALES[2025].thermal[3]).toEqual({ a: 0.529, b: 0.316, c: 1065, d: 0.37 });
+    expect(IK_SCALES[2025].thermal[4]).toEqual({ a: 0.606, b: 0.34, c: 1330, d: 0.407 });
+    expect(IK_SCALES[2025].thermal[5]).toEqual({ a: 0.636, b: 0.357, c: 1395, d: 0.427 });
+    expect(IK_SCALES[2025].thermal[6]).toEqual({ a: 0.665, b: 0.374, c: 1457, d: 0.447 });
+    expect(IK_SCALES[2025].thermal[7]).toEqual({ a: 0.697, b: 0.394, c: 1515, d: 0.47 });
   });
 
-  it('conserve les coefficients electriques de la v0.1.1', () => {
-    expect(IK_SCALES[2026].electric[3]).toEqual({ a: 0.635, b: 0.379, c: 1278, d: 0.444 });
-    expect(IK_SCALES[2026].electric[7]).toEqual({ a: 0.836, b: 0.473, c: 1818, d: 0.564 });
+  /*
+   * B4 — la majoration electrique est une donnee, jamais un calcul :
+   * 0,529 x 1,2 = 0,6348, que l'administration publie a 0,635. La recalculer
+   * ferait diverger l'application du texte.
+   */
+  it('conserve les coefficients électriques tels que publiés, non recalculés', () => {
+    expect(IK_SCALES[2025].electric[3]).toEqual({ a: 0.635, b: 0.379, c: 1278, d: 0.444 });
+    expect(IK_SCALES[2025].electric[7]).toEqual({ a: 0.836, b: 0.473, c: 1818, d: 0.564 });
+    expect(IK_SCALES[2025].electric[3].a).not.toBe(0.529 * 1.2);
   });
 
-  it('conserve les taux du bareme carburant BIC', () => {
+  // B2 — aucun arrete n'a modifie le bareme depuis les deplacements de 2022.
+  it('applique le même barème aux déplacements de 2022 à 2025', () => {
+    for (const year of [2022, 2023, 2024]) {
+      expect(IK_SCALES[year].thermal).toEqual(IK_SCALES[2025].thermal);
+      expect(IK_SCALES[year].electric).toEqual(IK_SCALES[2025].electric);
+    }
+  });
+
+  it('nomme chaque barème par son année de déplacement', () => {
+    expect(IK_SCALES[2024].label).toBe('Barème IK France — déplacements 2024');
+    expect(IK_SCALES[2024].year).toBe(2024);
+  });
+
+  // B10 a B12 — celui-ci change vraiment chaque annee, et il baisse.
+  it('conserve les taux du barème carburant BIC, année par année', () => {
+    expect(BIC_FUEL_SCALES[2023].rates['5-7']).toEqual({
+      diesel: 0.122,
+      petrol: 0.152,
+      lpg: 0.09,
+    });
+    expect(BIC_FUEL_SCALES[2024].rates['5-7']).toEqual({
+      diesel: 0.116,
+      petrol: 0.147,
+      lpg: 0.091,
+    });
     expect(BIC_FUEL_SCALES[2025].rates['3-4']).toEqual({
       diesel: 0.089,
       petrol: 0.113,
@@ -39,6 +75,46 @@ describe('bareme kilometrique — valeurs officielles', () => {
       petrol: 0.208,
       lpg: 0.133,
     });
+  });
+});
+
+describe('resolution du bareme par annee', () => {
+  // B1
+  it('rend le barème exact d’une année publiée', () => {
+    const { appliedYear, provisional } = resolveIkScale(2024);
+    expect(appliedYear).toBe(2024);
+    expect(provisional).toBe(false);
+  });
+
+  // B5 — le bareme de l'annee en cours ne parait qu'au printemps suivant.
+  it('signale comme provisoire une année sans barème publié', () => {
+    const { appliedYear, provisional } = resolveIkScale(2026);
+    expect(appliedYear).toBe(2025);
+    expect(provisional).toBe(true);
+  });
+
+  // B6
+  it('signale aussi une année trop ancienne', () => {
+    const { appliedYear, provisional } = resolveIkScale(2019);
+    expect(appliedYear).toBe(2022);
+    expect(provisional).toBe(true);
+  });
+
+  it('tolère une année absente ou illisible', () => {
+    expect(resolveIkScale(undefined).provisional).toBe(true);
+    expect(resolveIkScale('').scale).toBeTruthy();
+  });
+
+  it('applique la même règle au barème carburant BIC', () => {
+    expect(resolveBicScale(2024)).toMatchObject({ appliedYear: 2024, provisional: false });
+    expect(resolveBicScale(2026)).toMatchObject({ appliedYear: 2025, provisional: true });
+  });
+
+  // B10 a B13 — l'annee doit reellement changer le taux.
+  it('donne un taux BIC différent selon l’année', () => {
+    expect(bicRate(thermal5cv, 2023)).toBe(0.122);
+    expect(bicRate(thermal5cv, 2024)).toBe(0.116);
+    expect(bicRate(thermal5cv, 2025)).toBe(0.11);
   });
 });
 
@@ -84,7 +160,7 @@ describe('annualIkAmount', () => {
   });
 
   it('expose les coefficients reellement appliques', () => {
-    expect(getIkCoefficients({ cv: 30, electric: false })).toEqual(IK_SCALES[2026].thermal[7]);
+    expect(getIkCoefficients({ cv: 30, electric: false })).toEqual(IK_SCALES[2025].thermal[7]);
   });
 });
 
