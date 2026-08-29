@@ -70,7 +70,6 @@ function report(filters = {}) {
     beneficiary,
     appVersion: '0.2.0',
     filters: { companyId: 'c1', from: '2026-08-01', to: '2026-08-31', ...filters },
-    generatedAt: new Date('2026-09-15T10:00:00Z'),
   });
 }
 
@@ -321,7 +320,21 @@ describe('methode de calcul et vehicules', () => {
 
   it('reporte la version de l’application', () => {
     expect(report().appVersion).toBe('0.2.0');
-    expect(report().generatedAtLabel).toBe('15/09/2026');
+  });
+
+  /*
+   * Un meme etat de frais reedite deux mois plus tard doit rester le meme
+   * document. Une date d'edition le ferait paraitre different, sans rien
+   * apporter que la periode couverte ne dise deja.
+   */
+  it('ne porte aucune date d’édition', () => {
+    const built = report();
+    expect(built.generatedAt).toBeUndefined();
+    expect(built.generatedAtLabel).toBeUndefined();
+
+    // Aucun champ de premier niveau ne doit reintroduire la notion.
+    const suspects = Object.keys(built).filter((key) => /generat|edite|edited/i.test(key));
+    expect(suspects).toEqual([]);
   });
 });
 

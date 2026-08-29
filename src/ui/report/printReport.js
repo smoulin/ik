@@ -195,8 +195,10 @@ function buildFooterInfo(report) {
   const info = el('section', { class: 'print-info' }, rows);
 
   const footer = el('footer', { class: 'print-footer' }, [
+    // Sans date d'édition : un même état de frais réédité plus tard doit rester
+    // le même document. La période couverte est déjà indiquée plus haut.
     el('div', {
-      text: `Édité le ${report.generatedAtLabel} avec Agilmea IK ${report.appVersion}.`,
+      text: `Édité avec Agilmea IK ${report.appVersion}.`,
     }),
     el('div', {
       text: 'Document à conserver avec les justificatifs. Vérifier la conformité du régime fiscal retenu avec votre professionnel du chiffre.',

@@ -38,7 +38,11 @@ export const SUMMARY_TITLE = 'Synthèse des frais kilométriques';
  * @param {{companyId?: string, vehicleId?: string, from?: string, to?: string}} params.filters
  *        `companyId` vide : toutes les structures, en synthese
  * @param {string} [params.appVersion]
- * @param {Date}   [params.generatedAt]
+ *
+ * Le rapport ne porte AUCUNE date d'edition. Un meme etat de frais reedite
+ * deux mois plus tard doit rester le meme document : une date d'edition le
+ * ferait paraitre different, et n'apporte rien qui ne soit deja dans la
+ * periode couverte. Ne pas reintroduire de champ « genere le ».
  */
 export function buildReport({
   trips = [],
@@ -47,7 +51,6 @@ export function buildReport({
   beneficiary = null,
   filters = {},
   appVersion = '',
-  generatedAt = new Date(),
 }) {
   const { companyId = '', vehicleId = '', from = '', to = '' } = filters;
 
@@ -122,8 +125,6 @@ export function buildReport({
     allCompanies,
     byCompany: allCompanies ? buildCompanyTotals(lines, companyById) : [],
     warnings: buildWarnings({ company, companies, trips, lines, allCompanies }),
-    generatedAt: generatedAt.toISOString(),
-    generatedAtLabel: formatDateFr(toIsoDate(generatedAt)),
     appVersion,
   };
 }
@@ -386,11 +387,4 @@ function formatSiret(siret) {
 function round(value, decimals) {
   const factor = 10 ** decimals;
   return Math.round((Number(value) || 0) * factor) / factor;
-}
-
-function toIsoDate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
