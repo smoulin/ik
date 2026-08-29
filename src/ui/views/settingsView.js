@@ -6,7 +6,7 @@
 import { byId, el, delegate, setHidden, downloadBlob } from '../dom.js';
 import { attachAddressAutocomplete } from '../components/addressAutocomplete.js';
 import { suggestionToAddress } from '../../services/geo/types.js';
-import { calculationModeLabel } from '../../domain/mileage/engine.js';
+import { calculationModeName } from '../../domain/mileage/engine.js';
 import { formatAddressOneLine, isAddressEmpty, composeAddressLabel } from '../../domain/models.js';
 import { parseDecimal, formatDecimalInput } from '../../shared/format.js';
 import { mountScaleEditor, defaultCustomScale } from '../components/scaleEditor.js';
@@ -228,7 +228,7 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
 
     for (const company of store.state.companies) {
       const meta = [
-        calculationModeLabel(company),
+        calculationModeName(company),
         isAddressEmpty(company.address) ? null : formatAddressOneLine(company.address),
         company.siret ? `SIRET ${company.siret}` : null,
       ].filter(Boolean);

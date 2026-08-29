@@ -225,6 +225,33 @@ export function calculationModeLabel(company, vehicle = null, year = undefined) 
 }
 
 /**
+ * Nom du mode de calcul d'une structure, SANS annee.
+ *
+ * Une structure n'est liee a aucune annee : c'est la date de chaque trajet qui
+ * choisit le bareme. Afficher « deplacements 2025 » sur sa fiche laisserait
+ * croire que tous ses trajets relevent de cette annee-la — exactement la
+ * confusion que le moteur vient d'abandonner.
+ */
+export function calculationModeName(company) {
+  switch (company?.calculationMode) {
+    case CALCULATION_MODES.IK:
+      return 'Barème IK France (officiel)';
+    case CALCULATION_MODES.BIC:
+      return 'Barème carburant BIC (officiel)';
+    case CALCULATION_MODES.CUSTOM: {
+      const scale = normalizeCustomScale(company?.calculationSettings?.customScale);
+      return `${scale.label} — ${describeCustomScale(scale)}`;
+    }
+    case CALCULATION_MODES.FIXED: {
+      const rate = Number(company?.calculationSettings?.fixedRate) || 0;
+      return `Taux personnalisé ${formatRate(rate)}`;
+    }
+    default:
+      return 'Aucun remboursement';
+  }
+}
+
+/**
  * Mention accolee a un bareme qui n'est pas celui de l'annee demandee.
  *
  * Le cas courant est l'annee en cours : son bareme ne parait qu'au printemps
