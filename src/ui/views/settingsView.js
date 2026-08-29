@@ -452,7 +452,18 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
       const inspection = inspectBackup(data);
       if (!inspection.valid) throw new Error(inspection.reason);
 
-      const summary = `${inspection.counts.companies} structure(s), ${inspection.counts.vehicles} véhicule(s), ${inspection.counts.trips} trajet(s)`;
+      const summary = [
+        `${inspection.counts.companies} structure(s)`,
+        `${inspection.counts.vehicles} véhicule(s)`,
+        `${inspection.counts.trips} trajet(s)`,
+        // Absent des fichiers antérieurs à leur prise en charge : ne rien dire
+        // vaut mieux qu'annoncer « 0 trajet à valider » sans le savoir.
+        inspection.counts.tracks === null
+          ? null
+          : `${inspection.counts.tracks} trajet(s) à valider`,
+      ]
+        .filter(Boolean)
+        .join(', ');
       const message = inspection.legacy
         ? `Sauvegarde au format v0.1.1 détectée (${summary}). Elle sera convertie. Remplacer toutes les données actuelles ?`
         : `Sauvegarde détectée (${summary}). Remplacer toutes les données actuelles ?`;

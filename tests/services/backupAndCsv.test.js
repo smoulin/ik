@@ -20,6 +20,7 @@ import {
   tripRepository,
   favoritePlaceRepository,
   beneficiaryRepository,
+  trackRepository,
 } from '../../src/data/repositories/index.js';
 import { buildReport } from '../../src/domain/reporting/reportModel.js';
 import { createCompany, createVehicle, createTrip } from '../../src/domain/models.js';
@@ -114,6 +115,85 @@ describe('sauvegarde et restauration', () => {
 
   it('refuse un fichier invalide', async () => {
     await expect(restoreBackup({ nimporte: 'quoi' })).rejects.toThrow();
+  });
+});
+
+/*
+ * Les traces enregistrees mais pas encore validees.
+ *
+ * L'ecran de sauvegarde annonce « le seul moyen de les retrouver en cas de
+ * perte du telephone » : un travail absent du fichier est un travail perdu.
+ */
+describe('sauvegarde des trajets a valider', () => {
+  const trace = (overrides = {}) => ({
+    source: 'gpx',
+    fileName: 'trajet.gpx',
+    startedAt: '2026-08-27T08:47:03.000Z',
+    endedAt: '2026-08-27T08:54:58.000Z',
+    distanceMeters: 3300,
+    rawDistanceMeters: 3400,
+    quality: { pointCount: 94, usedCount: 64 },
+    start: { latitude: 45.316, longitude: 5.2296, label: 'Maison', labelSource: 'favorite' },
+    end: { latitude: 45.317, longitude: 5.2033, label: '70 Rue du Pont Neuf', labelSource: 'address' },
+    geometry: [[45.316, 5.2296], [45.317, 5.2033]],
+    status: 'pending',
+    ...overrides,
+  });
+
+  it('emporte les traces en attente dans le fichier', async () => {
+    await trackRepository.save(trace());
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    expect(backup.tracks).toHaveLength(1);
+    expect(backup.tracks[0].distanceMeters).toBe(3300);
+  });
+
+  it('les restaure sur un appareil vierge, tracé et libellés compris', async () => {
+    const origine = await trackRepository.save(trace());
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    await trackRepository.clear();
+    expect(await trackRepository.list()).toHaveLength(0);
+
+    await restoreBackup(backup);
+
+    const [restauree] = await trackRepository.list();
+    expect(restauree.id).toBe(origine.id);
+    expect(restauree.status).toBe('pending');
+    expect(restauree.distanceMeters).toBe(3300);
+    expect(restauree.start.label).toBe('Maison');
+    expect(restauree.start.labelSource).toBe('favorite');
+    expect(restauree.geometry).toHaveLength(2);
+    expect(restauree.startedAt).toBe('2026-08-27T08:47:03.000Z');
+  });
+
+  it('conserve une trace deja convertie ou ignoree', async () => {
+    await trackRepository.save(trace({ status: 'converted', tripId: 'trip_x' }));
+    await trackRepository.save(trace({ status: 'ignored', startedAt: '2026-08-26T08:00:00.000Z' }));
+
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+    await trackRepository.clear();
+    await restoreBackup(backup);
+
+    const statuts = (await trackRepository.list()).map((t) => t.status).sort();
+    expect(statuts).toEqual(['converted', 'ignored']);
+  });
+
+  /*
+   * Un fichier anterieur ne dit pas « aucune trace », il ne dit rien. Effacer
+   * sur cette base perdrait les trajets en attente au lieu de les restaurer.
+   */
+  it('ne touche pas aux traces quand le fichier n’en parle pas', async () => {
+    await trackRepository.save(trace());
+    await restoreBackup(LEGACY_BACKUP);
+
+    expect(await trackRepository.list()).toHaveLength(1);
+  });
+
+  it('distingue « aucune trace » de « fichier muet »', async () => {
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+    expect(inspectBackup(backup).counts.tracks).toBe(0);
+    expect(inspectBackup(LEGACY_BACKUP).counts.tracks).toBeNull();
   });
 });
 

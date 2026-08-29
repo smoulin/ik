@@ -16,18 +16,21 @@ import {
   tripRepository,
   favoritePlaceRepository,
   beneficiaryRepository,
+  trackRepository,
   settingsRepository,
 } from '../../data/repositories/index.js';
 
 export async function buildBackup({ appVersion = '' } = {}) {
-  const [companies, vehicles, trips, favoritePlaces, beneficiaries, settings] = await Promise.all([
-    companyRepository.list({ includeDeleted: true }),
-    vehicleRepository.list({ includeDeleted: true }),
-    tripRepository.list({ includeDeleted: true }),
-    favoritePlaceRepository.list({ includeDeleted: true }),
-    beneficiaryRepository.list({ includeDeleted: true }),
-    settingsRepository.all(),
-  ]);
+  const [companies, vehicles, trips, favoritePlaces, beneficiaries, tracks, settings] =
+    await Promise.all([
+      companyRepository.list({ includeDeleted: true }),
+      vehicleRepository.list({ includeDeleted: true }),
+      tripRepository.list({ includeDeleted: true }),
+      favoritePlaceRepository.list({ includeDeleted: true }),
+      beneficiaryRepository.list({ includeDeleted: true }),
+      trackRepository.list({ includeDeleted: true }),
+      settingsRepository.all(),
+    ]);
 
   return {
     format: 'agilmea-ik-backup',
@@ -39,6 +42,10 @@ export async function buildBackup({ appVersion = '' } = {}) {
     trips,
     favoritePlaces,
     beneficiaries,
+    // Les traces enregistrees mais pas encore validees sont, elles aussi, un
+    // travail a ne pas perdre : sans elles dans le fichier, un telephone perdu
+    // emportait definitivement tous les trajets restant a valider.
+    tracks,
     settings,
   };
 }
@@ -59,6 +66,11 @@ export function inspectBackup(data) {
         vehicles: data.vehicles?.length || 0,
         trips: data.trips?.length || 0,
         favoritePlaces: data.favoritePlaces?.length || 0,
+        // Traces enregistrees en attente de validation. `null` — et non zero —
+        // quand le fichier est anterieur a leur prise en charge : l'appelant
+        // doit pouvoir distinguer « aucune trace » de « le fichier n'en parle
+        // pas », faute de quoi une restauration effacerait celles en cours.
+        tracks: Array.isArray(data.tracks) ? data.tracks.length : null,
       },
     };
   }
@@ -73,6 +85,9 @@ export function inspectBackup(data) {
         vehicles: data.vehicles.length,
         trips: data.trips.length,
         favoritePlaces: 0,
+        // Le format v0.1.1 ignorait les traces : il n'en annonce donc aucune,
+        // ce qui n'est pas la meme chose que d'en annoncer zero.
+        tracks: null,
       },
     };
   }
@@ -105,6 +120,15 @@ export async function restoreBackup(data) {
   await tripRepository.saveMany(payload.trips || []);
   await favoritePlaceRepository.saveMany(payload.favoritePlaces || []);
   await beneficiaryRepository.saveMany(payload.beneficiaries || []);
+
+  // Les traces ne sont remplacees que si le fichier en parle. Un fichier
+  // anterieur a leur prise en charge ne dit pas « il n'y en a aucune », il ne
+  // dit rien : les effacer sur cette base perdrait les trajets en attente de
+  // validation au lieu de les restaurer.
+  if (Array.isArray(payload.tracks)) {
+    await trackRepository.clear();
+    await trackRepository.saveMany(payload.tracks);
+  }
 
   // Les reglages restaures se limitent au beneficiaire principal : reimporter
   // des drapeaux techniques (etat de migration...) ferait plus de mal que de bien.
