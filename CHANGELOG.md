@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.9.1] — 2026-09-01
+
 ### Corrigé
 - **Boîte « Importer une sauvegarde »** : un « null » s'affichait sous le résumé
   du fichier, et l'en-tête collé recouvrait la première ligne de texte.
