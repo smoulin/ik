@@ -144,25 +144,30 @@ export function createHomeView({ store, geo = null, onChanged = () => {}, onEdit
     statusEl.className = `status ${kind}`;
   }
 
+  /**
+   * Aide affichée hors de la coque Android, où l'enregistrement n'existe pas.
+   *
+   * Cet écran décrivait un montage GPSLogger + MacroDroid, abandonné : il ne
+   * fonctionnait pas de façon fiable, et l'application Android l'a remplacé.
+   * Laisser ces instructions serait envoyer l'utilisateur dans une impasse.
+   */
   function showAutoRecordHelp() {
     window.alert(
       [
         'Enregistrement automatique des trajets',
         '',
-        '1. Installer GPSLogger et MacroDroid (gratuits).',
-        '2. MacroDroid : créer une macro « Périphérique Bluetooth connecté »',
-        '   vers l’action « Envoyer un intent » :',
-        '     Cible   : Broadcast',
-        '     Action  : com.mendhak.gpslogger.TASKER_COMMAND',
-        '     Paquet  : com.mendhak.gpslogger',
-        '     Classe  : com.mendhak.gpslogger.TaskerReceiver',
-        '     Extra   : immediatestart = true',
-        '3. Une seconde macro sur « déconnecté », avec immediatestop.',
-        '4. GPSLogger : format GPX, localisation « Toujours autoriser »,',
-        '   et les deux applications en batterie « Sans restriction ».',
+        'Il demande l’application Android : elle enregistre seule, à la',
+        'connexion du Bluetooth du véhicule, sans que rien soit à ouvrir.',
+        'Dans un navigateur, cet enregistrement n’est pas possible — le GPS',
+        's’arrête dès que la page passe en arrière-plan.',
         '',
-        'À l’arrivée, partager le fichier GPX vers Agilmea IK,',
-        'ou l’importer ici avec le bouton « Importer un GPX ».',
+        'Ici, deux façons de faire entrer un trajet :',
+        '  • « Importer un GPX » — un fichier produit par n’importe quel',
+        '    enregistreur de trace ;',
+        '  • le partage Android vers Agilmea IK, depuis l’application qui a',
+        '    produit la trace.',
+        '',
+        'Ou saisir le trajet à la main avec le bouton « + ».',
       ].join('\n'),
     );
   }
@@ -231,7 +236,7 @@ export function createHomeView({ store, geo = null, onChanged = () => {}, onEdit
     if (!isRecorderAvailable()) {
       label.textContent = tracks.length
         ? `${tracks.length} trajet(s) enregistré(s) en attente`
-        : 'Aucun trajet en attente. Importe un fichier GPX ou partage-le depuis GPSLogger.';
+        : 'Aucun trajet en attente. Importe un fichier GPX, ou partage une trace vers Agilmea IK.';
       return;
     }
 

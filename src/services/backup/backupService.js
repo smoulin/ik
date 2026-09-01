@@ -96,6 +96,110 @@ export function inspectBackup(data) {
 }
 
 /**
+ * Rapproche une sauvegarde des donnees presentes, sans rien perdre.
+ *
+ * C'est ce qui permet de travailler des deux cotes — enregistrer sur le
+ * telephone, saisir et imprimer sur grand ecran — sans serveur ni compte : le
+ * fichier JSON, transmis par le moyen qu'on veut, sert d'echange.
+ *
+ * Regle unique, sans exception : le plus grand `updatedAt` l'emporte. Aucune
+ * entite n'est protegee, aucun trajet n'est fige, meme deja sorti dans un
+ * rapport — decision explicite de l'utilisateur, la coherence comptable lui
+ * revient. Consequence assumee : le bareme etant progressif par cumul annuel,
+ * une fusion peut modifier le montant d'un trajet deja declare.
+ *
+ * Une suppression se propage comme n'importe quelle modification : c'est a cela
+ * que sert `deletedAt`, et c'est pourquoi la sauvegarde exporte aussi les
+ * enregistrements supprimes.
+ *
+ * @param {object} data sauvegarde au format courant (le format v0.1.1 est refuse)
+ * @returns {Promise<object>} comptes par collection : ajoutes, mis a jour, ignores
+ */
+export async function mergeBackup(data) {
+  const inspection = inspectBackup(data);
+  if (!inspection.valid) throw new Error(inspection.reason);
+
+  // Le format v0.1.1 est anterieur aux champs de synchronisation : sans
+  // `updatedAt` fiable, fusionner reviendrait a deviner. Il reste restaurable.
+  if (inspection.legacy) {
+    throw new Error(
+      'Une sauvegarde au format v0.1.1 ne peut pas être fusionnée. Utilise « Remplacer ».',
+    );
+  }
+
+  const summary = {};
+
+  for (const [key, repository] of Object.entries(MERGEABLE)) {
+    summary[key] = await mergeCollection(repository, data[key]);
+  }
+
+  // Les reglages ne portent pas de date : on ne reprend que le beneficiaire
+  // principal, et seulement s'il n'y en a pas deja un. Ecraser un choix local
+  // sans pouvoir dater les deux serait arbitraire.
+  const localPrimary = await settingsRepository.get('primaryBeneficiaryId');
+  if (!localPrimary && data.settings?.primaryBeneficiaryId) {
+    await settingsRepository.set('primaryBeneficiaryId', data.settings.primaryBeneficiaryId);
+  }
+
+  return summary;
+}
+
+/** Depots fusionnables, dans l'ordre ou ils apparaissent dans le fichier. */
+const MERGEABLE = {
+  companies: companyRepository,
+  vehicles: vehicleRepository,
+  trips: tripRepository,
+  favoritePlaces: favoritePlaceRepository,
+  beneficiaries: beneficiaryRepository,
+  tracks: trackRepository,
+};
+
+/**
+ * Une collection. Le fichier ne peut qu'ajouter ou remplacer, jamais supprimer
+ * un enregistrement local qu'il ne connait pas : ce serait perdre le travail
+ * fait sur l'autre appareil depuis l'export.
+ */
+async function mergeCollection(repository, incoming) {
+  const counts = { added: 0, updated: 0, ignored: 0 };
+  if (!Array.isArray(incoming) || !incoming.length) return counts;
+
+  const local = new Map(
+    (await repository.list({ includeDeleted: true })).map((record) => [record.id, record]),
+  );
+
+  const winners = [];
+
+  for (const record of incoming) {
+    if (!record?.id) continue;
+
+    const mine = local.get(record.id);
+    if (!mine) {
+      // Inconnu ici : il entre, meme marque supprime — c'est ainsi qu'une
+      // suppression faite ailleurs se propage.
+      winners.push(record);
+      counts.added += 1;
+      continue;
+    }
+
+    // Dates ISO : elles se comparent comme du texte. A egalite le local reste,
+    // pour que deux fusions successives ne reecrivent pas les memes lignes.
+    if (String(record.updatedAt || '') > String(mine.updatedAt || '')) {
+      winners.push(record);
+      counts.updated += 1;
+    } else {
+      counts.ignored += 1;
+    }
+  }
+
+  // `saveMany` preserve `updatedAt` tel quel. Le remettre a l'instant present
+  // ferait gagner systematiquement la derniere fusion, et les deux appareils
+  // se renverraient eternellement les memes enregistrements.
+  if (winners.length) await repository.saveMany(winners);
+
+  return counts;
+}
+
+/**
  * Remplace l'integralite des donnees par le contenu de la sauvegarde.
  * Operation destructive : l'appelant doit avoir demande confirmation.
  */

@@ -10,7 +10,12 @@ import { calculationModeName } from '../../domain/mileage/engine.js';
 import { formatAddressOneLine, isAddressEmpty, composeAddressLabel } from '../../domain/models.js';
 import { parseDecimal, formatDecimalInput } from '../../shared/format.js';
 import { mountScaleEditor, defaultCustomScale } from '../components/scaleEditor.js';
-import { buildBackup, restoreBackup, inspectBackup } from '../../services/backup/backupService.js';
+import {
+  buildBackup,
+  restoreBackup,
+  mergeBackup,
+  inspectBackup,
+} from '../../services/backup/backupService.js';
 import { GEO_ATTRIBUTIONS } from '../../services/geo/index.js';
 import { nativeBuild } from '../../services/tracks/nativeRecorder.js';
 
@@ -464,20 +469,123 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
       ]
         .filter(Boolean)
         .join(', ');
-      const message = inspection.legacy
-        ? `Sauvegarde au format v0.1.1 détectée (${summary}). Elle sera convertie. Remplacer toutes les données actuelles ?`
-        : `Sauvegarde détectée (${summary}). Remplacer toutes les données actuelles ?`;
+      const choice = await askImportMode(summary, inspection.legacy);
+      if (choice === 'cancel') return;
 
-      if (!window.confirm(message)) return;
+      if (choice === 'merge') {
+        const counts = await mergeBackup(data);
+        await store.load();
+        setStatus(backupStatus, describeMerge(counts), 'good');
+        onChanged();
+        return;
+      }
 
       await restoreBackup(data);
       await store.load();
-      setStatus(backupStatus, 'Sauvegarde importée.', 'good');
+      setStatus(backupStatus, 'Sauvegarde importée : données remplacées.', 'good');
       onChanged();
     } catch (error) {
       setStatus(backupStatus, `Import impossible : ${error.message}`, 'bad');
     }
   });
+
+  /**
+   * Fusionner ou remplacer : trois issues, là où `window.confirm` n'en offre
+   * que deux. La distinction n'est pas cosmétique — l'une conserve ce qui est
+   * déjà là, l'autre l'efface.
+   */
+  function askImportMode(summary, legacy) {
+    return new Promise((resolve) => {
+      let answer = 'cancel';
+      const dialog = el('dialog', { class: 'recorder-setup' });
+
+      const close = (value) => {
+        answer = value;
+        if (dialog.open) dialog.close();
+        dialog.remove();
+        resolve(answer);
+      };
+
+      dialog.addEventListener('cancel', () => close('cancel'));
+      dialog.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') close('cancel');
+      });
+
+      dialog.append(
+        el('div', { class: 'dialog-head' }, [
+          el('h2', { text: 'Importer une sauvegarde' }),
+          el('button', {
+            class: 'dialog-close',
+            type: 'button',
+            text: '✕',
+            'aria-label': 'Annuler',
+            onClick: () => close('cancel'),
+          }),
+        ]),
+        el('p', { class: 'hint', text: `Fichier détecté : ${summary}.` }),
+        legacy
+          ? el('p', {
+              class: 'hint',
+              text:
+                'Format v0.1.1 : antérieur aux dates de synchronisation, il ne peut pas être ' +
+                'fusionné. Seul le remplacement est possible, après conversion.',
+            })
+          : null,
+        legacy
+          ? null
+          : el('button', {
+              class: 'primary wide',
+              type: 'button',
+              text: 'Fusionner',
+              onClick: () => close('merge'),
+            }),
+        legacy
+          ? null
+          : el('p', {
+              class: 'hint',
+              text:
+                'Rapproche les deux jeux de données sans rien perdre : pour chaque ' +
+                'enregistrement, la version la plus récente est retenue.',
+            }),
+        el('button', {
+          class: 'danger wide',
+          type: 'button',
+          text: 'Remplacer',
+          onClick: () => close('replace'),
+        }),
+        el('p', {
+          class: 'hint',
+          text: 'Efface toutes les données actuelles et les remplace par le fichier.',
+        }),
+      );
+
+      document.body.append(dialog);
+      dialog.showModal();
+    });
+  }
+
+  /** Compte rendu chiffré d'une fusion, collection par collection. */
+  function describeMerge(counts) {
+    const noms = {
+      companies: 'structure',
+      vehicles: 'véhicule',
+      trips: 'trajet',
+      favoritePlaces: 'lieu',
+      beneficiaries: 'bénéficiaire',
+      tracks: 'trajet à valider',
+    };
+
+    const parts = Object.entries(counts)
+      .filter(([, c]) => c.added || c.updated)
+      .map(([key, c]) => {
+        const detail = [c.added ? `${c.added} ajouté(s)` : null, c.updated ? `${c.updated} mis à jour` : null]
+          .filter(Boolean)
+          .join(', ');
+        return `${noms[key] || key} : ${detail}`;
+      });
+
+    return parts.length ? `Fusion effectuée — ${parts.join(' · ')}.` : 'Fusion effectuée — rien de nouveau.';
+  }
 
   /* ================================================================ */
   /* À propos                                                          */

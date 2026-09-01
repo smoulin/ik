@@ -380,6 +380,9 @@ export const TRACK_LABEL_SOURCES = ['favorite', 'address', 'none'];
  * @property {string|null} tripId   trajet cree a partir de cette trace
  */
 export function createTrack(input = {}) {
+  const status = TRACK_STATUSES.includes(input.status) ? input.status : 'pending';
+  const geometry = Array.isArray(input.geometry) ? input.geometry : [];
+
   return withMeta(
     {
       source: str(input.source) || 'gpx',
@@ -391,8 +394,21 @@ export function createTrack(input = {}) {
       quality: input.quality ?? null,
       start: trackEndpoint(input.start),
       end: trackEndpoint(input.end),
-      geometry: Array.isArray(input.geometry) ? input.geometry : [],
-      status: TRACK_STATUSES.includes(input.status) ? input.status : 'pending',
+      /*
+       * Le trace n'a d'utilite qu'a l'ecran « A valider », pour montrer par ou
+       * l'on est passe avant de decider. Une fois la trace validee ou ignoree,
+       * plus rien ne le lit — mais il pesait indefiniment dans la base et dans
+       * la sauvegarde : quelques milliers de points par trajet long.
+       *
+       * L'enregistrement lui-meme est conserve : il sert de temoin pour ne pas
+       * reimporter deux fois la meme session. Seuls ses points disparaissent.
+       *
+       * La regle vit ici, et non dans les boutons « Valider » et « Ignorer » :
+       * elle s'applique ainsi a tous les chemins d'ecriture, restauration d'une
+       * sauvegarde comprise.
+       */
+      geometry: status === 'pending' ? geometry : [],
+      status,
       tripId: input.tripId ? str(input.tripId) : null,
     },
     input,
