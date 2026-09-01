@@ -1468,8 +1468,14 @@ dialog h2 {
  * d'autorisation au systeme, pas un envoi. Elle porte donc elle-meme le
  * remplissage que `dialog form` apporte ailleurs.
  */
+/*
+ * Pas de remplissage EN HAUT : c'est l'en-tete colle qui l'apporte. Le lui
+ * retirer ici et le lui rendre par une marge negative le placerait au-dessus de
+ * l'origine du defilement — `position: sticky` le ramenerait alors a zero, et
+ * son fond opaque recouvrirait la premiere ligne du contenu.
+ */
 .recorder-setup {
-  padding: 18px;
+  padding: 0 18px 18px;
   overflow-y: auto;
 }
 
@@ -1489,7 +1495,7 @@ dialog h2 {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin: -18px -18px 0;
+  margin: 0 -18px 10px;
   padding: 18px 18px 10px;
   background: var(--surface);
 }

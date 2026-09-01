@@ -45,7 +45,16 @@ doit contenir aucune date du jour.
 
 ---
 
-### [ ] 2026-09-01 — Rendu visuel de la boîte « Importer une sauvegarde » non vérifié
+### [x] 2026-09-01 — Rendu visuel de la boîte « Importer une sauvegarde » non vérifié
+
+**Résolu le 01/09/2026, v0.9.1.** La vérification différée a effectivement
+révélé deux défauts, signalés par l'utilisateur sur une copie d'écran : un nœud
+de texte « null » et un en-tête collé qui recouvrait la première ligne. Les deux
+sont corrigés, et la mise en page est désormais mesurée — boutons de largeur
+égale, titre non chevauché, aucun débordement. Ce report avait un coût : les
+deux défauts sont partis en production.
+
+
 
 **Source** : revue de la v0.9.0, commit `feat(backup): merge two devices instead of overwriting one`
 **Tags** : `ux`
