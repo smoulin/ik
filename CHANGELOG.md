@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.9.0] — 2026-09-01
+
 ### Ajouté
 - **Application Android** : l'application web est désormais empaquetée dans une
   coque Capacitor. Elle sert la même page, avec le même moteur de calcul, mais
