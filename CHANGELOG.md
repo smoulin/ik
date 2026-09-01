@@ -8,6 +8,57 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+### Ajouté
+- **Application Android** : l'application web est désormais empaquetée dans une
+  coque Capacitor. Elle sert la même page, avec le même moteur de calcul, mais
+  peut faire ce qu'un navigateur ne sait pas faire.
+- **Enregistrement automatique des trajets**, déclenché par la connexion
+  Bluetooth du véhicule. Le service tourne application fermée : un trajet
+  s'enregistre sans que rien soit à ouvrir, et arrive seul dans « À valider ».
+  Mesure validée au compteur du véhicule : −0,88 % sur 90 km.
+- **Journal de diagnostic** consultable depuis « Configurer ». Le service
+  enregistre application fermée : quand il échoue, personne n'est là pour le
+  voir. Cinq jours d'enregistrements avaient été perdus faute de ce journal.
+- **Adresse des extrémités d'un trajet enregistré.** Une extrémité proche d'un
+  lieu favori porte le nom du favori ; sinon son adresse est retrouvée auprès de
+  la Base Adresse Nationale. Le rapprochement est refait à chaque ouverture : un
+  domicile enregistré aujourd'hui nomme les trajets d'hier.
+- **Fusion de deux sauvegardes.** Importer remplaçait tout, ce qui effaçait le
+  travail fait sur l'autre appareil. La fusion rapproche les deux jeux de
+  données, enregistrement par enregistrement, la version la plus récente étant
+  retenue. « Remplacer » reste disponible, et l'import propose les deux.
+- **Barèmes de plusieurs années.** Un trajet est calculé au barème officiel de
+  l'année où il a été fait : on peut donc créer ou corriger un trajet passé sans
+  fausser son montant. Rien à choisir, la date suffit.
+
+### Corrigé
+- **Le barème carburant BIC était appliqué à la mauvaise année.** Ce barème est
+  republié chaque année et il baisse : 100 km d'un 5 CV gazole valent 12,20 € en
+  2023 et 11,00 € en 2025. Tous les trajets étaient valorisés au dernier barème
+  connu. Le barème kilométrique était juste par chance — aucun arrêté ne l'a
+  modifié depuis les déplacements de 2022.
+- **La sauvegarde ne contenait pas les trajets à valider.** L'écran annonce
+  pourtant « le seul moyen de les retrouver en cas de perte du téléphone » :
+  un téléphone perdu emportait tous les trajets en attente.
+- **Le code postal et la ville se répétaient** dans une adresse reprise d'une
+  saisie précédente (« … 38980 Châtenay, 38980 Châtenay »). Corrigé aux trois
+  endroits où la répétition pouvait naître ; enregistrer à nouveau une fiche
+  existante la répare, sans rien retaper.
+- **Les rapports ne portent plus de date d'édition.** Un même état de frais
+  réédité deux mois plus tard doit rester le même document.
+- Une trace sans déplacement — contact mis puis coupé sans rouler — était
+  retentée et signalée en rouge à chaque ouverture, sans fin.
+- Boutons d'action d'un trajet alignés, heure qui ne se coupe plus en deux, et
+  croix de fermeture sur les boîtes de configuration.
+- L'aide affichée dans un navigateur décrivait encore le montage GPSLogger +
+  MacroDroid, abandonné.
+
+### Modifié
+- Le tracé d'une trace est effacé une fois celle-ci validée ou ignorée. Plus
+  rien ne le lit, et il pesait quelques milliers de points par trajet long dans
+  la base comme dans chaque sauvegarde. L'enregistrement reste, comme témoin
+  contre un réimport.
+
 ## [0.8.1] — 2026-08-18
 
 ### Corrigé
