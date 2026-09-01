@@ -511,7 +511,10 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
         if (event.key === 'Escape') close('cancel');
       });
 
-      dialog.append(
+      // `Node.append` n'est pas `el` : il convertit `null` en un nœud de texte
+      // « null », bien visible à l'écran. Les branches conditionnelles doivent
+      // donc être filtrées avant d'être ajoutées.
+      const contenu = [
         el('div', { class: 'dialog-head' }, [
           el('h2', { text: 'Importer une sauvegarde' }),
           el('button', {
@@ -557,8 +560,9 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
           class: 'hint',
           text: 'Efface toutes les données actuelles et les remplace par le fichier.',
         }),
-      );
+      ].filter(Boolean);
 
+      dialog.append(...contenu);
       document.body.append(dialog);
       dialog.showModal();
     });
