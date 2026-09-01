@@ -60,9 +60,26 @@ h3 {
   box-sizing: border-box;
 }
 
+/*
+ * Zones sures.
+ *
+ * Depuis Android 15, une application qui vise le SDK 35 est affichee bord a
+ * bord : la page passe SOUS la barre d'etat et sous les boutons de navigation.
+ * Il faut donc reserver ces bandes explicitement.
+ *
+ * On lit d'abord la variable injectee par Capacitor, qui mesure les marges
+ * cote natif, et on retombe sur `env()` pour le navigateur. Les WebView Android
+ * anterieures a la version 140 renvoient des valeurs fausses pour `env()` :
+ * s'y fier seul laisserait le bogue en place sur une partie des telephones.
+ */
+:root {
+  --inset-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+
 body {
   margin: 0;
-  padding-bottom: 78px;
+  padding-bottom: calc(78px + var(--inset-bottom));
 }
 
 /* ----------------------------------------------------------------- */
@@ -262,18 +279,21 @@ button.ghost {
   justify-content: space-between;
 }
 
-/* Un bouton pleine largeur qui suit une rangée de boutons a besoin d'air :
+/* Un bouton pleine largeur et une rangée de boutons ont besoin d'air entre eux :
    collés, ils se lisent comme un seul groupe. */
 .button-row + button.wide,
+button.wide + .button-row,
 .button-row + .button-row {
   margin-top: 14px;
 }
 
 /* Rangée de boutons de même poids : colonnes égales plutôt qu'un flux qui
-   se replie dès que l'un des libellés s'allonge. */
+   se replie dès que l'un des libellés s'allonge. Le nombre de colonnes suit le
+   nombre de boutons — deux comme trois, sans avoir à le déclarer. */
 .button-row.equal {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -665,7 +685,6 @@ td.num {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 66px;
   background: #fff;
   border-top: 1px solid #ddd;
   display: grid;
@@ -673,7 +692,9 @@ td.num {
   grid-template-columns: 1fr 1fr auto 1fr 1fr;
   align-items: center;
   z-index: 10;
-  padding-bottom: env(safe-area-inset-bottom);
+  /* Les 66 px utiles, plus la bande occupee par les boutons du telephone. */
+  height: calc(66px + var(--inset-bottom));
+  padding-bottom: var(--inset-bottom);
 }
 
 .bottom-nav button {
@@ -889,6 +910,15 @@ td.num {
 .trip-endpoint .dot {
   color: var(--muted);
   flex-shrink: 0;
+}
+
+/* L'heure ne se coupe jamais : « 10:4 » sur une ligne et « 7 » sur la suivante
+   ne se lit plus. C'est le libellé, de longueur variable, qui se replie —
+   depuis qu'il porte une adresse complète et non plus « Lieu inconnu ». */
+.trip-endpoint .meta {
+  flex: 0 0 auto;
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .trip-figures {
@@ -1108,7 +1138,8 @@ body {
 
 .app-header {
   background: var(--brand-ink);
-  padding: 14px 18px;
+  /* La barre d'etat se superpose au bandeau : on lui rend sa hauteur. */
+  padding: calc(14px + var(--inset-top)) 18px 14px;
   gap: 12px;
   /* Filet doré : rappel discret du cadre du logo. */
   border-bottom: 2px solid var(--gold);
@@ -1426,4 +1457,127 @@ dialog h2 {
   letter-spacing: 0.08em;
   color: var(--brand-ink-soft);
   margin: 0 0 9px;
+}
+
+/* ----------------------------------------------------------------- */
+/* Configuration de l'enregistrement automatique (coque Android)       */
+/* ----------------------------------------------------------------- */
+
+/*
+ * Cette boite n'a pas de <form> : ses actions declenchent des demandes
+ * d'autorisation au systeme, pas un envoi. Elle porte donc elle-meme le
+ * remplissage que `dialog form` apporte ailleurs.
+ */
+.recorder-setup {
+  padding: 18px;
+  overflow-y: auto;
+}
+
+/*
+ * En-tete d'une boite modale : le titre, et la croix qui la ferme.
+ *
+ * Elle reste collee en haut pendant le defilement. C'est necessaire ici : le
+ * journal fait plusieurs ecrans, et une croix qui disparait au premier
+ * defilement ne ferme plus rien. Les marges negatives lui rendent la pleine
+ * largeur que le remplissage de la boite lui retire.
+ */
+.dialog-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -18px -18px 0;
+  padding: 18px 18px 10px;
+  background: var(--surface);
+}
+
+.dialog-head h2 {
+  margin: 0;
+}
+
+/*
+ * La touche Echap ferme deja la boite : la croix ne fait qu'exposer ce geste
+ * au doigt. 40 px de cote, pour rester atteignable sans viser.
+ */
+.dialog-close {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--brand-ink-soft);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.dialog-close:hover {
+  background: var(--gold-wash);
+}
+
+.recorder-setup h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand-ink-soft);
+  margin: 18px 0 8px;
+}
+
+.setup-step {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+/* Une etape accordee s'efface ; une etape manquante doit se voir. */
+.setup-step.todo {
+  border-color: var(--gold);
+  background: var(--gold-wash);
+}
+
+.setup-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setup-badge {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.device-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.device-list button {
+  text-align: left;
+  white-space: pre-line;
+  line-height: 1.35;
+}
+
+/* Journal de diagnostic : lisibilite avant elegance. */
+.recorder-setup .diary {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #f4f5f8;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  margin: 0 0 10px;
 }

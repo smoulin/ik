@@ -15,17 +15,29 @@ import { byId, el, setHidden } from '../dom.js';
 import { createRouteMap } from '../components/routeMap.js';
 import { trackRepository } from '../../data/repositories/index.js';
 import { createTrackImportService, trackToTripDraft } from '../../services/tracks/trackImportService.js';
+import {
+  isRecorderAvailable,
+  collectSessions,
+  recordingStatus,
+  getVehicle,
+  readiness,
+} from '../../services/tracks/nativeRecorder.js';
+import { openRecorderSetup } from '../components/recorderSetup.js';
 import { favoritePlaceRepository } from '../../data/repositories/index.js';
 import { computeTripAmounts } from '../../domain/mileage/engine.js';
 import { toKilometers } from '../../domain/tracks/trackDistance.js';
 import { formatKm, formatMoney } from '../../shared/format.js';
 
-export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
+export function createHomeView({ store, geo = null, onChanged = () => {}, onEditDraft }) {
   const list = byId('tracksList');
   const statusEl = byId('trackStatus');
   const badge = byId('homeBadge');
 
-  const importService = createTrackImportService({ trackRepository, favoritePlaceRepository });
+  const importService = createTrackImportService({
+    trackRepository,
+    favoritePlaceRepository,
+    geocodingService: geo?.geocodingService || null,
+  });
 
   /** Cartes ouvertes, pour ne pas les refermer à chaque rafraîchissement. */
   const expanded = new Set();
@@ -40,7 +52,55 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
     if (files.length) await importFiles(files);
   });
 
-  byId('autoRecordHelpBtn').addEventListener('click', showAutoRecordHelp);
+  byId('autoRecordHelpBtn').addEventListener('click', () => {
+    if (!isRecorderAvailable()) {
+      showAutoRecordHelp();
+      return;
+    }
+    openRecorderSetup({ onChanged: refresh }).catch((error) =>
+      setStatus(`Configuration indisponible : ${error.message || error}`, 'bad'),
+    );
+  });
+
+  // Le service enregistre pendant que l'application est fermee : c'est donc a
+  // l'ouverture, et a chaque retour au premier plan, qu'on va chercher ce
+  // qu'il a produit.
+  if (isRecorderAvailable()) {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') collectFromDevice();
+    });
+  }
+
+  /** Recupere les trajets enregistres par le service natif. */
+  async function collectFromDevice() {
+    if (!isRecorderAvailable()) return;
+
+    try {
+      const summary = await collectSessions({
+        importGpx: importService.importGpx,
+        isDuplicate: importService.isDuplicate,
+        // Reimporter la meme trace ne doit pas creer de doublon.
+        discard: (track) => trackRepository.remove(track.id, { hard: true }),
+      });
+
+      await refresh();
+
+      // L'ordre dit la gravité : un échec passager passe avant un compte-rendu.
+      if (summary.problems.length) {
+        setStatus(summary.problems.join(' · '), 'bad');
+      } else if (summary.imported) {
+        setStatus(`${summary.imported} trajet(s) enregistré(s) récupéré(s).`, 'good');
+      } else if (summary.unusable) {
+        // Ni une réussite ni une panne : un contact mis puis coupé sans rouler.
+        setStatus(
+          `${summary.unusable} enregistrement(s) sans déplacement, écarté(s).`,
+          '',
+        );
+      }
+    } catch (error) {
+      setStatus(`Récupération impossible : ${error.message || error}`, 'bad');
+    }
+  }
 
   /* ---------------------------------------------------------------- */
   /* Import                                                            */
@@ -84,25 +144,30 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
     statusEl.className = `status ${kind}`;
   }
 
+  /**
+   * Aide affichée hors de la coque Android, où l'enregistrement n'existe pas.
+   *
+   * Cet écran décrivait un montage GPSLogger + MacroDroid, abandonné : il ne
+   * fonctionnait pas de façon fiable, et l'application Android l'a remplacé.
+   * Laisser ces instructions serait envoyer l'utilisateur dans une impasse.
+   */
   function showAutoRecordHelp() {
     window.alert(
       [
         'Enregistrement automatique des trajets',
         '',
-        '1. Installer GPSLogger et MacroDroid (gratuits).',
-        '2. MacroDroid : créer une macro « Périphérique Bluetooth connecté »',
-        '   vers l’action « Envoyer un intent » :',
-        '     Cible   : Broadcast',
-        '     Action  : com.mendhak.gpslogger.TASKER_COMMAND',
-        '     Paquet  : com.mendhak.gpslogger',
-        '     Classe  : com.mendhak.gpslogger.TaskerReceiver',
-        '     Extra   : immediatestart = true',
-        '3. Une seconde macro sur « déconnecté », avec immediatestop.',
-        '4. GPSLogger : format GPX, localisation « Toujours autoriser »,',
-        '   et les deux applications en batterie « Sans restriction ».',
+        'Il demande l’application Android : elle enregistre seule, à la',
+        'connexion du Bluetooth du véhicule, sans que rien soit à ouvrir.',
+        'Dans un navigateur, cet enregistrement n’est pas possible — le GPS',
+        's’arrête dès que la page passe en arrière-plan.',
         '',
-        'À l’arrivée, partager le fichier GPX vers Agilmea IK,',
-        'ou l’importer ici avec le bouton « Importer un GPX ».',
+        'Ici, deux façons de faire entrer un trajet :',
+        '  • « Importer un GPX » — un fichier produit par n’importe quel',
+        '    enregistreur de trace ;',
+        '  • le partage Android vers Agilmea IK, depuis l’application qui a',
+        '    produit la trace.',
+        '',
+        'Ou saisir le trajet à la main avec le bouton « + ».',
       ].join('\n'),
     );
   }
@@ -116,14 +181,93 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
       .filter((track) => track.status === 'pending')
       .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
 
-    byId('autoRecordState').textContent = tracks.length
-      ? `${tracks.length} trajet(s) enregistré(s) en attente`
-      : 'Aucun trajet en attente. Importe un fichier GPX ou partage-le depuis GPSLogger.';
+    // Les favoris ont pu changer depuis l'import : un domicile enregistré hier
+    // doit nommer les trajets d'avant-hier. Comparaison locale, sans réseau.
+    await importService.matchFavorites(tracks).catch(() => {});
+
+    await refreshRecorderState();
 
     badge.textContent = String(tracks.length);
     setHidden(badge, tracks.length === 0);
 
     render();
+    nameAnonymousEndpoints();
+  }
+
+  /**
+   * Donne une adresse aux extrémités qu'aucun lieu favori n'a nommées.
+   *
+   * En tâche de fond, après l'affichage : la liste doit apparaître tout de
+   * suite, même sans réseau. Une extrémité déjà nommée — ou dont le nommage a
+   * déjà échoué — n'est pas redemandée, donc cette passe ne coûte rien une fois
+   * les trajets connus.
+   */
+  function nameAnonymousEndpoints() {
+    const anonymous = tracks.filter(
+      (track) => needsName(track.start) || needsName(track.end),
+    );
+    if (!anonymous.length) return;
+
+    importService
+      .nameEndpoints(anonymous)
+      .then((named) => {
+        // `nameEndpoints` met à jour les traces déjà en mémoire : un simple
+        // réaffichage suffit, sans relire la base.
+        if (named) render();
+      })
+      .catch(() => {});
+  }
+
+  function needsName(endpoint) {
+    return Boolean(endpoint) && !endpoint.label && !endpoint.labelSource;
+  }
+
+  /**
+   * Etat de l'enregistrement automatique.
+   *
+   * Dans le navigateur, la chaine passe encore par un fichier GPX importe a la
+   * main. Dans la coque Android, l'application sait si un trajet est en cours
+   * et quel vehicule le declenche : autant le dire, c'est ce qui rassure sur le
+   * fait que rien n'est en train de se perdre.
+   */
+  async function refreshRecorderState() {
+    const label = byId('autoRecordState');
+
+    if (!isRecorderAvailable()) {
+      label.textContent = tracks.length
+        ? `${tracks.length} trajet(s) enregistré(s) en attente`
+        : 'Aucun trajet en attente. Importe un fichier GPX, ou partage une trace vers Agilmea IK.';
+      return;
+    }
+
+    try {
+      const [status, vehicle, state] = await Promise.all([
+        recordingStatus(),
+        getVehicle(),
+        readiness(),
+      ]);
+
+      if (status.recording) {
+        label.textContent = `Enregistrement en cours · ${formatKm(status.kilometers)}`;
+        return;
+      }
+
+      // Un prerequis manquant ne se voit nulle part ailleurs : sans lui, le
+      // trajet ne sera tout simplement jamais enregistre, et l'absence ne
+      // s'explique pas d'elle-meme.
+      const missing = [
+        !vehicle?.name ? 'aucun véhicule choisi' : null,
+        !state.location ? 'position refusée' : null,
+        !state.backgroundLocation ? 'position en arrière-plan refusée' : null,
+        !state.batteryUnrestricted ? 'batterie restreinte' : null,
+      ].filter(Boolean);
+
+      label.textContent = missing.length
+        ? `Inactif — ${missing.join(', ')}. Appuie sur « Configurer ».`
+        : `Prêt — démarre à la connexion de ${vehicle.name}.`;
+    } catch {
+      label.textContent = 'Enregistrement automatique indisponible.';
+    }
   }
 
   function render() {
@@ -179,9 +323,17 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
       : '';
     return el('div', { class: 'trip-endpoint' }, [
       el('span', { class: 'dot', text: letter }),
-      el('span', { text: endpoint?.label || 'Lieu inconnu' }),
+      // Le lieu, lui, est parfaitement connu : ce sont ses coordonnées. C'est
+      // son adresse qui manque — soit elle est en cours de résolution, soit
+      // aucun fournisseur ne sait la nommer.
+      el('span', { text: endpoint?.label || endpointFallback(endpoint) }),
       heure ? el('span', { class: 'meta', text: heure }) : null,
     ]);
+  }
+
+  function endpointFallback(endpoint) {
+    if (!endpoint) return 'Point inconnu';
+    return endpoint.labelSource === 'none' ? 'Adresse non trouvée' : 'Recherche de l’adresse…';
   }
 
   function formatPeriod(track) {
@@ -232,12 +384,15 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
       estimate,
       mapNode,
       el('div', { class: 'track-quality', text: qualityLabel(track) }),
-      el('div', { class: 'button-row' }, [
-        el('button', {
-          class: 'primary',
-          text: 'Valider ce trajet',
-          onClick: () => convert(track, selectedCompanyId),
-        }),
+      // L'action principale occupe toute la largeur ; les deux autres se
+      // partagent la suivante en parts égales. Sur un écran de téléphone, les
+      // trois côte à côte se repliaient au hasard des libellés.
+      el('button', {
+        class: 'primary wide',
+        text: 'Valider ce trajet',
+        onClick: () => convert(track, selectedCompanyId),
+      }),
+      el('div', { class: 'button-row equal' }, [
         el('button', { text: 'Compléter', onClick: () => editDraft(track, selectedCompanyId) }),
         el('button', { class: 'danger', text: 'Ignorer', onClick: () => ignore(track) }),
       ]),
@@ -338,5 +493,5 @@ export function createHomeView({ store, onChanged = () => {}, onEditDraft }) {
     setStatus('Trajet ignoré.', '');
   }
 
-  return { refresh, importSharedFile };
+  return { refresh, importSharedFile, collectFromDevice };
 }

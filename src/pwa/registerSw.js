@@ -7,10 +7,17 @@
  * d'anciens fichiers sur localhost.
  */
 
+import { Capacitor } from '@capacitor/core';
 import { byId, setHidden } from '../ui/dom.js';
 
 export function registerServiceWorker({ isDev = false } = {}) {
   if (!('serviceWorker' in navigator)) return;
+
+  // Dans la coque native, l'application est deja servie depuis le telephone :
+  // un service worker n'apporterait aucune disponibilite hors ligne
+  // supplementaire, et interposerait un second cache entre le code livre et le
+  // code execute — donc une source de decalage a chaque mise a jour.
+  if (Capacitor.isNativePlatform()) return;
 
   if (isDev || location.protocol === 'file:') {
     unregisterEverything();

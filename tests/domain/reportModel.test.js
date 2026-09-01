@@ -70,7 +70,6 @@ function report(filters = {}) {
     beneficiary,
     appVersion: '0.2.0',
     filters: { companyId: 'c1', from: '2026-08-01', to: '2026-08-31', ...filters },
-    generatedAt: new Date('2026-09-15T10:00:00Z'),
   });
 }
 
@@ -293,11 +292,57 @@ describe('avertissement sur le partage d’un vehicule entre structures', () => 
 });
 
 describe('methode de calcul et vehicules', () => {
+  /*
+   * B14 — l'annee du bareme vient de la DATE DES TRAJETS, pas de la structure.
+   * Les trajets de reference sont dates de 2026 : aucun bareme n'est encore
+   * publie pour cette annee, le dernier connu sert et le dit.
+   */
   it('indique la methode et l’annee du bareme', () => {
     const result = report();
     expect(result.calculation.mode).toBe('ik2026');
-    expect(result.calculation.label).toContain('Barème IK France 2026');
-    expect(result.calculation.scaleYear).toBe(2026);
+    expect(result.calculation.label).toContain('déplacements 2025');
+    expect(result.calculation.scaleYear).toBe(2025);
+    expect(result.calculation.scaleProvisional).toBe(true);
+  });
+
+  it('valorise un trajet passé au barème de son année', () => {
+    const ancien = createTrip({
+      id: 'vieux',
+      companyId: 'c1',
+      vehicleId: 'v1',
+      date: '2024-06-15',
+      km: 100,
+    });
+    const result = buildReport({
+      trips: [ancien],
+      companies: [company],
+      vehicles: [vehicle],
+      beneficiary,
+      filters: { companyId: 'c1', from: '2024-01-01', to: '2024-12-31' },
+    });
+
+    expect(result.calculation.scaleYear).toBe(2024);
+    expect(result.calculation.scaleProvisional).toBe(false);
+    expect(result.lines[0].scaleYear).toBe(2024);
+  });
+
+  // B15 — a cheval sur deux annees, aucune ne peut representer l'autre.
+  it('annonce les deux années quand le rapport est à cheval', () => {
+    const trajets = [
+      createTrip({ id: 'a', companyId: 'c1', vehicleId: 'v1', date: '2024-12-20', km: 50 }),
+      createTrip({ id: 'b', companyId: 'c1', vehicleId: 'v1', date: '2025-01-10', km: 50 }),
+    ];
+    const result = buildReport({
+      trips: trajets,
+      companies: [company],
+      vehicles: [vehicle],
+      beneficiary,
+      filters: { companyId: 'c1', from: '2024-12-01', to: '2025-01-31' },
+    });
+
+    expect(result.calculation.scaleYears).toEqual([2024, 2025]);
+    // Aucune annee unique ne doit etre annoncee a la place des deux.
+    expect(result.calculation.scaleYear).toBeNull();
   });
 
   it('recapitule les vehicules utilises avec leur puissance fiscale', () => {
@@ -321,7 +366,21 @@ describe('methode de calcul et vehicules', () => {
 
   it('reporte la version de l’application', () => {
     expect(report().appVersion).toBe('0.2.0');
-    expect(report().generatedAtLabel).toBe('15/09/2026');
+  });
+
+  /*
+   * Un meme etat de frais reedite deux mois plus tard doit rester le meme
+   * document. Une date d'edition le ferait paraitre different, sans rien
+   * apporter que la periode couverte ne dise deja.
+   */
+  it('ne porte aucune date d’édition', () => {
+    const built = report();
+    expect(built.generatedAt).toBeUndefined();
+    expect(built.generatedAtLabel).toBeUndefined();
+
+    // Aucun champ de premier niveau ne doit reintroduire la notion.
+    const suspects = Object.keys(built).filter((key) => /generat|edite|edited/i.test(key));
+    expect(suspects).toEqual([]);
   });
 });
 

@@ -9,6 +9,7 @@ import { byId, el, fillSelect, setHidden, downloadBlob } from '../dom.js';
 import { buildReport } from '../../domain/reporting/reportModel.js';
 import { renderPrintReport } from '../report/printReport.js';
 import { buildCsv, csvFileName } from '../../services/export/csvExport.js';
+import { printCurrentView } from '../../services/platform/printing.js';
 import { formatKm, formatMoney, formatNumberFr, todayIso, lastDayOfMonth } from '../../shared/format.js';
 
 export function createReportsView({ store, appVersion }) {
@@ -23,7 +24,9 @@ export function createReportsView({ store, appVersion }) {
 
   byId('generateReportBtn').addEventListener('click', generate);
   byId('csvBtn').addEventListener('click', exportCsv);
-  byId('printBtn').addEventListener('click', () => window.print());
+  byId('printBtn').addEventListener('click', () => {
+    printCurrentView().catch((error) => console.warn('[impression] echec', error));
+  });
 
   byId('reportThisMonthBtn').addEventListener('click', () => setMonthRange(0));
   byId('reportPrevMonthBtn').addEventListener('click', () => setMonthRange(-1));
@@ -127,7 +130,10 @@ export function createReportsView({ store, appVersion }) {
       : [
           report.period.label,
           `Méthode : ${report.calculation.label}`,
-          report.calculation.scaleYear ? `Barème ${report.calculation.scaleYear}` : null,
+          // Plusieurs années possibles : le barème suit la date de chaque trajet.
+          report.calculation.scaleYears?.length
+            ? `Barème ${report.calculation.scaleYears.join(' et ')}`
+            : null,
         ]
           .filter(Boolean)
           .join(' · ');

@@ -3,6 +3,8 @@
  * aucun framework, et n'en a pas besoin a cette echelle.
  */
 
+import { deliverFile } from '../services/platform/fileDelivery.js';
+
 export const byId = (id) => document.getElementById(id);
 export const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
@@ -62,13 +64,17 @@ export function fillSelect(select, items, { labelOf, value, leading = null }) {
   else if (leading) select.value = leading.value;
 }
 
-/** Telechargement d'un contenu genere localement (CSV, sauvegarde JSON). */
+/**
+ * Telechargement d'un contenu genere localement (CSV, sauvegarde JSON).
+ *
+ * La remise du fichier differe entre le navigateur et la coque native ; le
+ * detail est isole dans `services/platform/fileDelivery.js`. Les appelants
+ * n'ont pas a savoir sur quelle plateforme ils tournent.
+ */
 export function downloadBlob(content, type, fileName) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const link = el('a', { href: url, download: fileName });
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return deliverFile(content, type, fileName).catch((error) => {
+    // Un partage abandonne par l'utilisateur passe aussi par ici : ce n'est
+    // pas une panne, il ne faut donc rien lui montrer d'alarmant.
+    console.warn('[fichier] remise interrompue', error);
+  });
 }

@@ -44,6 +44,8 @@ import { completeSuggestionLocality } from '../../shared/address.js';
  * @property {number} longitude
  * @property {string} label
  * @property {string} provider
+ * @property {number} [distanceMeters]  ecart entre le point demande et l'adresse
+ *   trouvee — renseigne par le geocodage inverse uniquement
  */
 
 /**
@@ -52,6 +54,11 @@ import { completeSuggestionLocality } from '../../shared/address.js';
  * @property {string} label
  * @property {string} attribution
  * @property {(address: string, options?: {signal?: AbortSignal}) => Promise<GeocodingResult>} geocode
+ * @property {((latitude: number, longitude: number, options?: {signal?: AbortSignal}) => Promise<GeocodingResult>)} [reverse]
+ *   Sens inverse : « coordonnees -> adresse ». OPTIONNEL — un fournisseur qui
+ *   ne sait pas le faire reste conforme au contrat, et la cascade le saute.
+ *   Sert a nommer les extremites d'une trace GPS, qui n'arrivent qu'avec des
+ *   coordonnees.
  * @property {number} [minDelayMs]  delai minimal impose entre deux appels
  */
 

@@ -1,7 +1,7 @@
 {
   "name": "agilmea-ik",
   "private": true,
-  "version": "0.8.1",
+  "version": "0.9.0",
   "type": "module",
   "description": "Agilmea IK â€” suivi des frais kilometriques multi-structures (PWA locale, sans backend).",
   "scripts": {
@@ -20,11 +20,16 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "fake-indexeddb": "^6.2.5",
     "vite": "^6.4.3",
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/share": "^8.0.1",
     "leaflet": "^1.9.4"
   }
 }

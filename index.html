@@ -293,13 +293,26 @@
         <div class="card small-text">
           <h2>Barèmes intégrés</h2>
           <p>
-            <b>Barème IK France 2026 :</b> barème officiel Urssaf pour voitures
-            thermiques/hybrides/hydrogène et électriques, appliqué sur le cumul annuel par
-            structure et par véhicule.
+            <b>L'année du trajet choisit le barème.</b> Un trajet daté de 2024 est calculé
+            au barème officiel de 2024, même saisi aujourd'hui : tu peux donc créer ou
+            corriger des trajets passés sans fausser leur montant. L'année réellement
+            appliquée figure sur le rapport.
           </p>
           <p>
-            <b>Carburant BIC :</b> dernier barème officiel disponible, applicable aux dépenses
-            2025 et publié le 18/02/2026. Le taux dépend du carburant et de la puissance fiscale.
+            <b>Barème IK France :</b> barème officiel pour voitures
+            thermiques/hybrides/hydrogène et électriques, appliqué sur le cumul annuel par
+            structure et par véhicule. Fixé par l'arrêté du 27 mars 2023, inchangé depuis :
+            les déplacements de 2022 à 2025 relèvent donc du même barème.
+          </p>
+          <p>
+            <b>Carburant BIC :</b> barèmes des dépenses 2023, 2024 et 2025. Celui-ci est
+            republié chaque année et il baisse — l'année du trajet change réellement le
+            montant. Le taux dépend du carburant et de la puissance fiscale.
+          </p>
+          <p>
+            <b>Année en cours :</b> son barème n'est publié qu'au printemps suivant. Le
+            dernier barème connu est appliqué et le rapport porte la mention
+            « barème provisoire ». Rééditer l'état si le texte définitif modifie les taux.
           </p>
           <p>
             <a
@@ -434,14 +447,24 @@
         </div>
         <label
           >Mode de calcul
+          <!--
+            Les valeurs (ik2026, bic2025) sont enregistrees dans les structures :
+            elles ne doivent pas changer. Seuls les libelles evoluent — ils ne
+            portent plus d'annee, puisque c'est la date du trajet qui la choisit.
+          -->
           <select id="companyScheme">
-            <option value="ik2026">Barème IK France 2026</option>
-            <option value="bic2025">Barème carburant BIC (dernier officiel : 2025)</option>
+            <option value="ik2026">Barème IK France (officiel)</option>
+            <option value="bic2025">Barème carburant BIC (officiel)</option>
             <option value="fixed">Taux personnalisé (un seul taux)</option>
             <option value="custom">Barème personnalisé (par tranches)</option>
             <option value="none">Aucun remboursement</option>
           </select>
         </label>
+        <p class="hint">
+          Pas d'année à choisir : chaque trajet est calculé au barème officiel de
+          l'année où il a été fait. Un trajet daté de 2024 utilise le barème 2024,
+          même saisi aujourd'hui. L'année appliquée est indiquée sur le rapport.
+        </p>
         <label id="fixedRateWrap" class="hidden"
           >Taux personnalisé €/km
           <input id="companyFixedRate" type="text" inputmode="decimal" placeholder="0,139" />

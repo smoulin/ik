@@ -43,6 +43,9 @@ export async function createApp({ appVersion }) {
 
   const homeView = createHomeView({
     store,
+    // Les extremites d'une trace n'arrivent qu'en coordonnees : sans geocodage
+    // inverse, elles resteraient anonymes dans la liste.
+    geo,
     onChanged: () => refreshAll(),
     // « Compléter » ouvre le formulaire pré-rempli avec la trace mesurée.
     onEditDraft: (draft) => {
@@ -95,6 +98,10 @@ export async function createApp({ appVersion }) {
 
   setupInstallPrompt();
   await receiveSharedFile(homeView);
+
+  // Trajets enregistres par le service natif pendant que l'application etait
+  // fermee. Sans await : rien ne doit retarder l'affichage.
+  homeView.collectFromDevice?.().catch(() => {});
 
   return { store, geo, refreshAll, switchTab, homeView };
 }

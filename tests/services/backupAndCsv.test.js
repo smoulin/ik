@@ -7,7 +7,12 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDatabase } from '../helpers/db.js';
-import { buildBackup, restoreBackup, inspectBackup } from '../../src/services/backup/backupService.js';
+import {
+  buildBackup,
+  restoreBackup,
+  mergeBackup,
+  inspectBackup,
+} from '../../src/services/backup/backupService.js';
 import {
   buildCsv,
   CSV_HEADER,
@@ -20,6 +25,8 @@ import {
   tripRepository,
   favoritePlaceRepository,
   beneficiaryRepository,
+  trackRepository,
+  settingsRepository,
 } from '../../src/data/repositories/index.js';
 import { buildReport } from '../../src/domain/reporting/reportModel.js';
 import { createCompany, createVehicle, createTrip } from '../../src/domain/models.js';
@@ -114,6 +121,315 @@ describe('sauvegarde et restauration', () => {
 
   it('refuse un fichier invalide', async () => {
     await expect(restoreBackup({ nimporte: 'quoi' })).rejects.toThrow();
+  });
+});
+
+/*
+ * Les traces enregistrees mais pas encore validees.
+ *
+ * L'ecran de sauvegarde annonce « le seul moyen de les retrouver en cas de
+ * perte du telephone » : un travail absent du fichier est un travail perdu.
+ */
+describe('sauvegarde des trajets a valider', () => {
+  const trace = (overrides = {}) => ({
+    source: 'gpx',
+    fileName: 'trajet.gpx',
+    startedAt: '2026-08-27T08:47:03.000Z',
+    endedAt: '2026-08-27T08:54:58.000Z',
+    distanceMeters: 3300,
+    rawDistanceMeters: 3400,
+    quality: { pointCount: 94, usedCount: 64 },
+    start: { latitude: 45.316, longitude: 5.2296, label: 'Maison', labelSource: 'favorite' },
+    end: { latitude: 45.317, longitude: 5.2033, label: '70 Rue du Pont Neuf', labelSource: 'address' },
+    geometry: [[45.316, 5.2296], [45.317, 5.2033]],
+    status: 'pending',
+    ...overrides,
+  });
+
+  it('emporte les traces en attente dans le fichier', async () => {
+    await trackRepository.save(trace());
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    expect(backup.tracks).toHaveLength(1);
+    expect(backup.tracks[0].distanceMeters).toBe(3300);
+  });
+
+  it('les restaure sur un appareil vierge, tracé et libellés compris', async () => {
+    const origine = await trackRepository.save(trace());
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    await trackRepository.clear();
+    expect(await trackRepository.list()).toHaveLength(0);
+
+    await restoreBackup(backup);
+
+    const [restauree] = await trackRepository.list();
+    expect(restauree.id).toBe(origine.id);
+    expect(restauree.status).toBe('pending');
+    expect(restauree.distanceMeters).toBe(3300);
+    expect(restauree.start.label).toBe('Maison');
+    expect(restauree.start.labelSource).toBe('favorite');
+    expect(restauree.geometry).toHaveLength(2);
+    expect(restauree.startedAt).toBe('2026-08-27T08:47:03.000Z');
+  });
+
+  it('conserve une trace deja convertie ou ignoree', async () => {
+    await trackRepository.save(trace({ status: 'converted', tripId: 'trip_x' }));
+    await trackRepository.save(trace({ status: 'ignored', startedAt: '2026-08-26T08:00:00.000Z' }));
+
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+    await trackRepository.clear();
+    await restoreBackup(backup);
+
+    const statuts = (await trackRepository.list()).map((t) => t.status).sort();
+    expect(statuts).toEqual(['converted', 'ignored']);
+  });
+
+  /*
+   * Un fichier anterieur ne dit pas « aucune trace », il ne dit rien. Effacer
+   * sur cette base perdrait les trajets en attente au lieu de les restaurer.
+   */
+  it('ne touche pas aux traces quand le fichier n’en parle pas', async () => {
+    await trackRepository.save(trace());
+    await restoreBackup(LEGACY_BACKUP);
+
+    expect(await trackRepository.list()).toHaveLength(1);
+  });
+
+  it('distingue « aucune trace » de « fichier muet »', async () => {
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+    expect(inspectBackup(backup).counts.tracks).toBe(0);
+    expect(inspectBackup(LEGACY_BACKUP).counts.tracks).toBeNull();
+  });
+});
+
+/*
+ * Fusion de deux bases.
+ *
+ * Importer remplacait tout : sur le PC, cela effacait ce qui venait d'y etre
+ * saisi. La fusion permet de travailler des deux cotes sans serveur.
+ */
+describe('fusion de sauvegardes', () => {
+  const at = (iso) => iso;
+
+  // F1
+  it('fait entrer les enregistrements sur une base vide', async () => {
+    await companyRepository.save({ name: 'Apprima' });
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    await resetDatabase();
+    const counts = await mergeBackup(backup);
+
+    expect(counts.companies.added).toBe(1);
+    expect((await companyRepository.list())[0].name).toBe('Apprima');
+  });
+
+  // F2
+  it('laisse coexister deux enregistrements distincts', async () => {
+    await companyRepository.save({ id: 'c_distant', name: 'Distante' });
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    await resetDatabase();
+    await companyRepository.save({ id: 'c_locale', name: 'Locale' });
+    await mergeBackup(backup);
+
+    const noms = (await companyRepository.list()).map((c) => c.name).sort();
+    expect(noms).toEqual(['Distante', 'Locale']);
+  });
+
+  // F3 — le plus recent gagne.
+  it('retient la version distante quand elle est plus récente', async () => {
+    await companyRepository.save({ id: 'c1', name: 'Ancien nom', updatedAt: at('2026-01-01T00:00:00.000Z') });
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+    backup.companies[0].name = 'Nouveau nom';
+    backup.companies[0].updatedAt = at('2026-06-01T00:00:00.000Z');
+
+    const counts = await mergeBackup(backup);
+
+    expect(counts.companies.updated).toBe(1);
+    expect((await companyRepository.get('c1')).name).toBe('Nouveau nom');
+  });
+
+  // F4
+  it('conserve la version locale quand elle est plus récente', async () => {
+    await companyRepository.save({ id: 'c1', name: 'Locale récente', updatedAt: at('2026-06-01T00:00:00.000Z') });
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+    backup.companies[0].name = 'Distante ancienne';
+    backup.companies[0].updatedAt = at('2026-01-01T00:00:00.000Z');
+
+    const counts = await mergeBackup(backup);
+
+    expect(counts.companies.ignored).toBe(1);
+    expect((await companyRepository.get('c1')).name).toBe('Locale récente');
+  });
+
+  // F5 — a egalite, on ne reecrit rien.
+  it('ne réécrit rien à égalité de date', async () => {
+    await companyRepository.save({ id: 'c1', name: 'Identique' });
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    const counts = await mergeBackup(backup);
+    expect(counts.companies).toEqual({ added: 0, updated: 0, ignored: 1 });
+  });
+
+  // F6 — une suppression est une modification comme une autre.
+  it('propage une suppression faite ailleurs', async () => {
+    // Le local doit etre le plus ancien, sinon c'est lui qui gagne — et il a
+    // raison de gagner. La suppression ne se propage que si elle est posterieure.
+    const trip = await tripRepository.save({
+      companyId: 'c1',
+      vehicleId: 'v1',
+      date: '2026-05-05',
+      km: 10,
+      updatedAt: at('2026-05-05T00:00:00.000Z'),
+    });
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+    backup.trips[0].deletedAt = at('2026-07-01T00:00:00.000Z');
+    backup.trips[0].updatedAt = at('2026-07-01T00:00:00.000Z');
+
+    await mergeBackup(backup);
+
+    expect(await tripRepository.list()).toHaveLength(0);
+    const avecSupprimes = await tripRepository.list({ includeDeleted: true });
+    expect(avecSupprimes).toHaveLength(1);
+    expect(avecSupprimes[0].id).toBe(trip.id);
+  });
+
+  // F7 — et ne ressuscite pas ce qu'on vient de supprimer ici.
+  it('ne ressuscite pas un enregistrement supprimé plus récemment en local', async () => {
+    const trip = await tripRepository.save({ companyId: 'c1', vehicleId: 'v1', date: '2026-05-05', km: 10 });
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+    backup.trips[0].updatedAt = at('2026-01-01T00:00:00.000Z');
+
+    await tripRepository.remove(trip.id);
+    await mergeBackup(backup);
+
+    expect(await tripRepository.list()).toHaveLength(0);
+  });
+
+  // F8
+  it('fait entrer un enregistrement inconnu déjà supprimé', async () => {
+    const trip = await tripRepository.save({ companyId: 'c1', vehicleId: 'v1', date: '2026-05-05', km: 10 });
+    await tripRepository.remove(trip.id);
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    await resetDatabase();
+    await mergeBackup(backup);
+
+    expect(await tripRepository.list()).toHaveLength(0);
+    expect(await tripRepository.list({ includeDeleted: true })).toHaveLength(1);
+  });
+
+  /*
+   * F9 — le point le plus contre-intuitif. Remettre `updatedAt` a l'instant
+   * present ferait gagner systematiquement la derniere fusion, et les deux
+   * appareils se renverraient eternellement les memes enregistrements.
+   */
+  it('préserve updatedAt au lieu de le remettre à maintenant', async () => {
+    await companyRepository.save({ id: 'c1', name: 'X', updatedAt: at('2026-01-01T00:00:00.000Z') });
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+    backup.companies[0].name = 'Y';
+    backup.companies[0].updatedAt = at('2026-06-01T00:00:00.000Z');
+
+    await mergeBackup(backup);
+
+    expect((await companyRepository.get('c1')).updatedAt).toBe('2026-06-01T00:00:00.000Z');
+  });
+
+  // F10
+  it('est idempotente : la deuxième fusion ne change rien', async () => {
+    await companyRepository.save({ name: 'Apprima' });
+    await tripRepository.save({ companyId: 'c1', vehicleId: 'v1', date: '2026-05-05', km: 10 });
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    await resetDatabase();
+    await mergeBackup(backup);
+    const second = await mergeBackup(backup);
+
+    for (const counts of Object.values(second)) {
+      expect(counts.added).toBe(0);
+      expect(counts.updated).toBe(0);
+    }
+  });
+
+  // F11 — aller-retour complet entre deux appareils.
+  it('rend les deux bases identiques après un aller-retour', async () => {
+    // Appareil A.
+    await companyRepository.save({ id: 'a', name: 'Chez A' });
+    const deA = await buildBackup({ appVersion: '0.8.1' });
+
+    // Appareil B, avec son propre travail, qui recoit A.
+    await resetDatabase();
+    await companyRepository.save({ id: 'b', name: 'Chez B' });
+    await mergeBackup(deA);
+    const deB = await buildBackup({ appVersion: '0.8.1' });
+    const chezB = (await companyRepository.list()).map((c) => c.id).sort();
+
+    // A recoit B en retour.
+    await resetDatabase();
+    await companyRepository.save({ id: 'a', name: 'Chez A' });
+    await mergeBackup(deB);
+    const chezA = (await companyRepository.list()).map((c) => c.id).sort();
+
+    expect(chezA).toEqual(['a', 'b']);
+    expect(chezA).toEqual(chezB);
+  });
+
+  // F12
+  it('reprend le bénéficiaire principal quand il n’y en a pas', async () => {
+    const b = await beneficiaryRepository.save({ firstName: 'Steph', lastName: 'Moulin' });
+    await settingsRepository.set('primaryBeneficiaryId', b.id);
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    await resetDatabase();
+    await mergeBackup(backup);
+
+    expect(await settingsRepository.get('primaryBeneficiaryId')).toBe(b.id);
+  });
+
+  // F13
+  it('ne remplace pas un bénéficiaire principal déjà choisi', async () => {
+    const b = await beneficiaryRepository.save({ firstName: 'Steph', lastName: 'Moulin' });
+    await settingsRepository.set('primaryBeneficiaryId', b.id);
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    await resetDatabase();
+    await settingsRepository.set('primaryBeneficiaryId', 'choix_local');
+    await mergeBackup(backup);
+
+    expect(await settingsRepository.get('primaryBeneficiaryId')).toBe('choix_local');
+  });
+
+  // F14 — sans dates de synchronisation, fusionner reviendrait a deviner.
+  it('refuse une sauvegarde v0.1.1', async () => {
+    await companyRepository.save({ name: 'À garder' });
+    await expect(mergeBackup(LEGACY_BACKUP)).rejects.toThrow(/v0\.1\.1|Remplacer/);
+    expect((await companyRepository.list())[0].name).toBe('À garder');
+  });
+
+  // F15
+  it('refuse un fichier illisible sans rien toucher', async () => {
+    await companyRepository.save({ name: 'À garder' });
+    await expect(mergeBackup({ nimporte: 'quoi' })).rejects.toThrow();
+    expect(await companyRepository.list()).toHaveLength(1);
+  });
+
+  it('fusionne aussi les trajets en attente de validation', async () => {
+    await trackRepository.save({
+      source: 'gpx',
+      startedAt: '2026-08-27T08:47:03.000Z',
+      distanceMeters: 3300,
+      start: { latitude: 45.3, longitude: 5.2 },
+      end: { latitude: 45.4, longitude: 5.3 },
+      status: 'pending',
+    });
+    const backup = await buildBackup({ appVersion: '0.8.1' });
+
+    await resetDatabase();
+    const counts = await mergeBackup(backup);
+
+    expect(counts.tracks.added).toBe(1);
+    expect(await trackRepository.list()).toHaveLength(1);
   });
 });
 

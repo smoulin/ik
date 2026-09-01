@@ -94,6 +94,8 @@ export function csvFileName(report, { companyName = '' } = {}) {
     .replace(new RegExp('[\\u0300-\\u036f]', 'g'), '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-  const period = report.period?.from || new Date().toISOString().slice(0, 10);
-  return `agilmea-ik-${slug}-${period}.csv`;
+  // Le nom porte la periode couverte, jamais la date du jour : un export refait
+  // plus tard doit produire le meme fichier, pas un fichier date d'aujourd'hui.
+  const period = report.period?.from || '';
+  return period ? `agilmea-ik-${slug}-${period}.csv` : `agilmea-ik-${slug}.csv`;
 }

@@ -25,7 +25,26 @@ import { formatAddressOneLine } from '../../domain/models.js';
  */
 export const PLACE_MATCH_RADIUS_M = 200;
 
-export function createTrackImportService({ trackRepository, favoritePlaceRepository }) {
+/**
+ * Trace dont le contenu ne pourra jamais donner un trajet : fichier illisible,
+ * ou enregistrement sans deplacement — un contact mis puis coupe sans rouler.
+ *
+ * Distincte d'une panne passagere : reessayer ne changera rien, alors qu'une
+ * lecture qui echoue merite une seconde chance. Sans cette distinction, une
+ * trace vide est retentee et signalee en rouge a chaque ouverture, sans fin.
+ */
+export class UnusableTrackError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'UnusableTrackError';
+  }
+}
+
+export function createTrackImportService({
+  trackRepository,
+  favoritePlaceRepository,
+  geocodingService = null,
+}) {
   /**
    * Analyse un fichier GPX et enregistre la trace correspondante.
    *
@@ -33,11 +52,18 @@ export function createTrackImportService({ trackRepository, favoritePlaceReposit
    * @returns {Promise<object>} la trace enregistree
    */
   async function importGpx({ name = '', text }) {
-    const { points } = parseGpx(text);
+    let points;
+    try {
+      ({ points } = parseGpx(text));
+    } catch (error) {
+      // Le contenu est en cause, pas les circonstances : inutile d'y revenir.
+      throw new UnusableTrackError(error.message);
+    }
+
     const measured = computeTrackDistance(points);
 
     if (measured.usedCount < 2 || measured.distanceMeters <= 0) {
-      throw new Error('Cette trace ne contient pas de déplacement exploitable.');
+      throw new UnusableTrackError('Cette trace ne contient pas de déplacement exploitable.');
     }
 
     const places = favoritePlaceRepository ? await favoritePlaceRepository.list() : [];
@@ -79,7 +105,127 @@ export function createTrackImportService({ trackRepository, favoritePlaceReposit
     );
   }
 
-  return { importGpx, isDuplicate };
+  /**
+   * Rapproche les traces des lieux favoris tels qu'ils sont maintenant.
+   *
+   * Le rapprochement fait a l'import fige l'etat des favoris de ce jour-la.
+   * Or on enregistre son domicile en favori APRES avoir vu passer des trajets
+   * qui en partent : il faut donc reprendre les traces deja la. A l'inverse,
+   * un favori supprime doit rendre a l'extremite son adresse.
+   *
+   * Purement local : aucune requete, c'est une comparaison de coordonnees.
+   *
+   * @param {object[]} tracks
+   * @returns {Promise<number>} nombre de traces modifiees
+   */
+  async function matchFavorites(tracks = []) {
+    if (!tracks.length) return 0;
+
+    const places = favoritePlaceRepository ? await favoritePlaceRepository.list() : [];
+    let changed = 0;
+
+    for (const track of tracks) {
+      const start = rematch(track.start, places);
+      const end = rematch(track.end, places);
+      if (!start.changed && !end.changed) continue;
+
+      await trackRepository.save({ ...track, start: start.endpoint, end: end.endpoint });
+      track.start = start.endpoint;
+      track.end = end.endpoint;
+      changed += 1;
+    }
+
+    return changed;
+  }
+
+  /**
+   * Donne une adresse aux extremites qu'aucun lieu favori n'a nommees.
+   *
+   * Etape volontairement separee de l'import : `importGpx` ne fait aucune
+   * requete, et une trace enregistree sans reseau arrive quand meme dans la
+   * liste. Le nommage est au mieux-effort — il ne doit jamais faire perdre un
+   * trajet, seulement l'enrichir quand c'est possible.
+   *
+   * @param {object[]} tracks
+   * @returns {Promise<number>} nombre de traces effectivement renommees
+   */
+  async function nameEndpoints(tracks = []) {
+    if (!geocodingService?.describe) return 0;
+
+    let named = 0;
+
+    for (const track of tracks) {
+      const start = await describeEndpointAddress(track.start);
+      const end = await describeEndpointAddress(track.end);
+      if (!start.changed && !end.changed) continue;
+
+      await trackRepository.save({ ...track, start: start.endpoint, end: end.endpoint });
+      // La trace en memoire suit l'enregistrement : l'appelant affiche souvent
+      // la liste qu'il vient de passer, sans la relire.
+      track.start = start.endpoint;
+      track.end = end.endpoint;
+      named += 1;
+    }
+
+    return named;
+  }
+
+  /**
+   * Un seul point. Une extremite deja nommee, ou dont le nommage a deja echoue,
+   * n'est pas redemandee : c'est ce que retient `labelSource: 'none'`.
+   */
+  async function describeEndpointAddress(endpoint) {
+    if (!endpoint || endpoint.label || endpoint.labelSource) {
+      return { endpoint, changed: false };
+    }
+
+    try {
+      const found = await geocodingService.describe({
+        latitude: endpoint.latitude,
+        longitude: endpoint.longitude,
+      });
+      if (!found?.label) throw new Error('sans libellé');
+      return {
+        endpoint: { ...endpoint, label: found.label, labelSource: 'address' },
+        changed: true,
+      };
+    } catch {
+      return { endpoint: { ...endpoint, labelSource: 'none' }, changed: true };
+    }
+  }
+
+  return { importGpx, isDuplicate, matchFavorites, nameEndpoints };
+}
+
+/**
+ * Une extremite, confrontee aux favoris actuels.
+ *
+ * Un favori l'emporte toujours sur une adresse : c'est un nom choisi, il dit ce
+ * que l'adresse ne dit pas. Quand plus aucun favori ne correspond, l'extremite
+ * redevient anonyme pour que son adresse soit cherchee a nouveau.
+ */
+function rematch(endpoint, places) {
+  if (!endpoint) return { endpoint, changed: false };
+
+  const nearest = findNearestPlace([endpoint.latitude, endpoint.longitude], places);
+
+  if (nearest) {
+    const label = placeLabel(nearest.place);
+    if (endpoint.labelSource === 'favorite' && endpoint.placeId === nearest.place.id && endpoint.label === label) {
+      return { endpoint, changed: false };
+    }
+    return {
+      endpoint: { ...endpoint, label, placeId: nearest.place.id, labelSource: 'favorite' },
+      changed: true,
+    };
+  }
+
+  if (endpoint.labelSource !== 'favorite') return { endpoint, changed: false };
+
+  return {
+    endpoint: { ...endpoint, label: '', placeId: null, labelSource: '' },
+    changed: true,
+  };
 }
 
 /**
@@ -98,6 +244,7 @@ export function describeEndpoint(coordinates, places = [], radius = PLACE_MATCH_
     longitude,
     label: nearest ? placeLabel(nearest.place) : '',
     placeId: nearest ? nearest.place.id : null,
+    labelSource: nearest ? 'favorite' : '',
   };
 }
 
@@ -118,9 +265,13 @@ export function findNearestPlace(coordinates, places = [], radius = PLACE_MATCH_
   return best;
 }
 
+/**
+ * Un favori porte un nom choisi par l'utilisateur — « Domicile », « Bureau ».
+ * C'est lui qu'on affiche : il dit ce que l'adresse ne dit pas. L'adresse ne
+ * sert que de repli, pour un favori enregistre sans nom.
+ */
 function placeLabel(place) {
-  const address = formatAddressOneLine(place.address);
-  return address || place.name || '';
+  return place.name || formatAddressOneLine(place.address) || '';
 }
 
 /**
