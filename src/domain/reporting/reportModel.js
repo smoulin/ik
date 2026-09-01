@@ -17,6 +17,7 @@ import {
 import {
   computeTripAmounts,
   calculationModeLabel,
+  calculationModeName,
 
   IK_ACCUMULATION_SCOPE,
 } from '../mileage/engine.js';
@@ -304,7 +305,15 @@ function buildCalculationBlock(company, lines, vehicleById) {
     mode: company?.calculationMode || 'none',
     // Le libelle suit l'annee des trajets. A cheval sur deux annees, aucune ne
     // peut representer l'autre : on ne nomme alors pas de bareme unique.
-    label: calculationModeLabel(company, singleVehicle, years.length === 1 ? years[0] : undefined),
+    // Une seule année : on la nomme. Plusieurs — ou aucune, sur un rapport vide
+    // — : le libellé reste sans année. Passer `undefined` donnerait le dernier
+    // barème connu marqué provisoire, ce qui contredirait la ligne « Années du
+    // barème » juste en dessous et vaudrait réserve pour un rapport qui n'en
+    // mérite pas.
+    label:
+      years.length === 1
+        ? calculationModeLabel(company, singleVehicle, years[0])
+        : calculationModeName(company),
     scaleYear: years.length === 1 ? years[0] : null,
     scaleYears: years,
     scaleProvisional: lines.some((line) => line.scaleProvisional),
@@ -338,7 +347,15 @@ function buildCalculationsByCompany(lines, companyById, vehicleById) {
     seen.set(line.companyId, {
       companyId: line.companyId,
       companyName: company?.name || 'Structure supprimée',
-      label: calculationModeLabel(company, singleVehicle, years.length === 1 ? years[0] : undefined),
+      // Une seule année : on la nomme. Plusieurs — ou aucune, sur un rapport vide
+    // — : le libellé reste sans année. Passer `undefined` donnerait le dernier
+    // barème connu marqué provisoire, ce qui contredirait la ligne « Années du
+    // barème » juste en dessous et vaudrait réserve pour un rapport qui n'en
+    // mérite pas.
+    label:
+      years.length === 1
+        ? calculationModeLabel(company, singleVehicle, years[0])
+        : calculationModeName(company),
       scaleYear: years.length === 1 ? years[0] : null,
       scaleYears: years,
       scaleProvisional: companyLines.some((l) => l.scaleProvisional),

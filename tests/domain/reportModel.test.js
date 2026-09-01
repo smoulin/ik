@@ -343,6 +343,31 @@ describe('methode de calcul et vehicules', () => {
     expect(result.calculation.scaleYears).toEqual([2024, 2025]);
     // Aucune annee unique ne doit etre annoncee a la place des deux.
     expect(result.calculation.scaleYear).toBeNull();
+
+    /*
+     * Et le libelle ne doit pas en nommer une non plus : « déplacements 2025 »
+     * juste au-dessus de « Années du barème 2024 et 2025 » se contredit.
+     * La mention « provisoire » serait fausse par-dessus le marché, les deux
+     * années étant publiées.
+     */
+    expect(result.calculation.label).not.toMatch(/déplacements \d{4}/);
+    expect(result.calculation.label).not.toMatch(/provisoire/);
+  });
+
+  it('ne nomme aucun barème sur un rapport sans trajet', () => {
+    const result = buildReport({
+      trips,
+      companies: [company],
+      vehicles: [vehicle],
+      beneficiary,
+      filters: { companyId: 'c1', from: '2020-01-01', to: '2020-12-31' },
+    });
+
+    expect(result.lines).toHaveLength(0);
+    expect(result.calculation.scaleYears).toEqual([]);
+    // Un rapport vide n'a pas de réserve à porter.
+    expect(result.calculation.label).not.toMatch(/provisoire/);
+    expect(result.calculation.scaleProvisional).toBe(false);
   });
 
   it('recapitule les vehicules utilises avec leur puissance fiscale', () => {

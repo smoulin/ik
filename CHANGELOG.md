@@ -8,6 +8,14 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.9.2] — 2026-09-01
+
+### Corrigé
+- **En-tête d'un rapport couvrant plusieurs années** : il annonçait « Barème IK
+  France — déplacements 2025 · barème provisoire » juste au-dessus de « Années du
+  barème 2024 et 2025 ». Le libellé ne nomme plus d'année quand le rapport en
+  couvre plusieurs, ni sur un rapport sans trajet.
+
 ## [0.9.1] — 2026-09-01
 
 ### Corrigé
