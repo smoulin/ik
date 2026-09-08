@@ -38,7 +38,14 @@ export async function createApp({ appVersion }) {
     store,
     geo,
     switchTab,
-    onSaved: () => refreshAll(),
+    // Après avoir modifié un trajet, on revient là d'où l'on venait —
+    // l'historique — avec le trajet déplié, pour voir le résultat.
+    onSaved: async ({ editedTripId } = {}) => {
+      await refreshAll();
+      if (!editedTripId) return;
+      switchTab('history');
+      historyView.openTrip(editedTripId);
+    },
   });
 
   const homeView = createHomeView({
@@ -56,6 +63,9 @@ export async function createApp({ appVersion }) {
 
   const historyView = createHistoryView({
     store,
+    // Le tracé réel d'un trajet n'est pas stocké : il est recalculé quand on
+    // ouvre la carte, ce qui évite d'alourdir chaque trajet et chaque sauvegarde.
+    geo,
     onEdit: (id) => {
       tripView.edit(id);
       switchTab('trip');

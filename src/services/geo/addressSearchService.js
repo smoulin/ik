@@ -188,9 +188,10 @@ export function favoriteToSuggestion(place) {
     source: 'favorite',
     label: place.name,
     secondary: addressLabel,
-    // C'est l'adresse qui est ecrite dans le champ, pas le surnom du lieu :
-    // le rapport doit rester lisible par un tiers.
-    fullLabel: addressLabel || place.name,
+    // Le nom ET l'adresse sont ecrits dans le champ. Le nom seul rendrait
+    // l'etat de frais illisible pour un tiers — « Maison » ne prouve rien ;
+    // l'adresse seule ne dit pas a la saisie quel lieu on vient de choisir.
+    fullLabel: [place.name, addressLabel].filter(Boolean).join(' — ') || place.name,
     name: place.name,
     postalCode: place.address?.postalCode || '',
     city: place.address?.city || '',

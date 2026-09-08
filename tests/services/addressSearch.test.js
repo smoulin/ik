@@ -138,11 +138,21 @@ describe('priorite des sources', () => {
     expect((await service.search('chambery')).suggestions).toHaveLength(1);
   });
 
-  it('renseigne l’adresse du favori dans le champ, pas son surnom', () => {
+  /*
+   * Le nom seul rendrait l'etat de frais illisible pour un tiers — « Domicile »
+   * ne prouve rien. L'adresse seule ne disait pas, a la saisie, quel lieu on
+   * venait de choisir. Le champ porte donc les deux.
+   */
+  it('renseigne le nom ET l’adresse du favori dans le champ', () => {
     const suggestion = favoriteToSuggestion(domicile);
     expect(suggestion.label).toBe('Domicile');
-    expect(suggestion.fullLabel).toBe('12 rue Exemple, 38000 Grenoble');
+    expect(suggestion.fullLabel).toBe('Domicile — 12 rue Exemple, 38000 Grenoble');
     expect(suggestion.latitude).toBeCloseTo(45.188, 5);
+  });
+
+  it('se limite au nom pour un favori sans adresse', () => {
+    const suggestion = favoriteToSuggestion({ id: 'p9', name: 'Atelier', address: {} });
+    expect(suggestion.fullLabel).toBe('Atelier');
   });
 });
 

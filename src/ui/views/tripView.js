@@ -220,10 +220,12 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
       await store.saveTrip(trip);
       // La trace GPS d'origine ne doit plus figurer parmi les trajets a valider.
       if (draftTrackId) await store.markTrackConverted(draftTrackId);
-      const wasEditing = Boolean(editingId);
+      const editedId = editingId;
       reset();
-      showStatus(wasEditing ? 'Trajet modifié.' : 'Trajet enregistré.', 'good');
-      onSaved();
+      showStatus(editedId ? 'Trajet modifié.' : 'Trajet enregistré.', 'good');
+      // Modifier un trajet part de l'historique : y rester après avoir validé
+      // obligeait à y revenir à la main pour constater le résultat.
+      onSaved(editedId ? { editedTripId: editedId } : {});
     } catch (error) {
       showStatus(`Enregistrement impossible : ${error.message}`, 'bad');
     } finally {
