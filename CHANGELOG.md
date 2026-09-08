@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.10.0] — 2026-09-08
+
 ### Ajouté
 - **Le nom d'un lieu favori s'affiche en gras devant son adresse** dans
   l'historique. L'extrémité est rapprochée des favoris par ses coordonnées
