@@ -912,6 +912,18 @@ td.num {
   flex-shrink: 0;
 }
 
+/* Extrémité reconnue comme lieu favori : le nom porte, l'adresse suit et
+   s'efface un peu — on reconnaît le lieu d'un coup d'œil sans perdre l'adresse
+   exacte, qui reste ce qui fait foi. */
+.endpoint-named strong {
+  font-weight: 700;
+  color: var(--brand-ink);
+}
+
+.endpoint-named {
+  color: var(--muted);
+}
+
 /* L'heure ne se coupe jamais : « 10:4 » sur une ligne et « 7 » sur la suivante
    ne se lit plus. C'est le libellé, de longueur variable, qui se replie —
    depuis qu'il porte une adresse complète et non plus « Lieu inconnu ». */

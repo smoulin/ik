@@ -8,6 +8,20 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.10.0] — 2026-09-08
+
+### Ajouté
+- **Le nom d'un lieu favori s'affiche en gras devant son adresse** dans
+  l'historique. L'extrémité est rapprochée des favoris par ses coordonnées
+  d'abord — elles ne dépendent pas de la façon d'écrire une adresse — puis par
+  son texte. Les rapports et l'export CSV conservent les adresses : un état de
+  frais transmis à un tiers ne porte pas de surnoms.
+
+### Modifié
+- **Ordre des trajets d'une même journée** : ils suivent désormais l'ordre de
+  saisie. Un trajet ajouté par le « + » du jour se range sous les précédents, et
+  non plus au-dessus. Les journées restent de la plus récente à la plus ancienne.
+
 ## [0.9.2] — 2026-09-01
 
 ### Corrigé

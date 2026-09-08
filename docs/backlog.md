@@ -6,6 +6,41 @@ d'origine, doit pouvoir comprendre, reproduire et corriger.
 
 ---
 
+### [ ] 2026-09-08 — `findNearestPlace` vit dans un service de traces GPS alors qu'elle sert ailleurs
+
+**Source** : revue de la v0.10.0, commit `feat(history): keep a day in entry order, and name a favourite place`
+**Tags** : `tech-debt`
+**Effort estimé** : XS
+
+**Problème** : `findNearestPlace` est une fonction géographique pure — elle
+cherche le lieu favori le plus proche d'un point — mais elle est exportée depuis
+`trackImportService.js`, un service dédié à l'import de traces GPS. L'onglet
+Historique doit donc importer un module de traces pour nommer une extrémité de
+trajet, alors qu'il ne manipule aucune trace.
+
+**Localisation** : définie dans
+`src/services/tracks/trackImportService.js` (fonction `findNearestPlace` et la
+constante `PLACE_MATCH_RADIUS_M`) ; consommée par `src/ui/views/historyView.js`
+(fonction `matchFavorite`).
+
+**Pourquoi c'est gênant** : la dépendance suggère un lien qui n'existe pas entre
+l'historique et l'enregistrement GPS. Un futur lecteur cherchera pourquoi, et
+un futur découpage des modules butera dessus.
+
+**Pourquoi pas maintenant** : déplacer une fonction couverte par des tests
+existants, pour un gain uniquement structurel, n'avait pas sa place dans une
+livraison d'ergonomie demandée par l'utilisateur.
+
+**Comment corriger** : déplacer `findNearestPlace` et `PLACE_MATCH_RADIUS_M`
+vers un module de lieux — `src/domain/places.js` conviendrait — et faire
+pointer les deux consommateurs vers lui. Écueil : `tests/services/trackImport.test.js`
+importe ces deux symboles depuis le service, il faudra mettre à jour ses imports.
+
+**Validation** : `npm run check` reste vert, et
+`grep -r "services/tracks" src/ui/views/historyView.js` ne renvoie plus rien.
+
+---
+
 ### [ ] 2026-09-01 — Deux exports CSV « toutes dates » portent le même nom de fichier
 
 **Source** : revue de la v0.9.0, commit `fix(report): never stamp a report with the day it was printed`
