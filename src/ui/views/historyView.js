@@ -11,6 +11,9 @@
 import { byId, qsa, el, fillSelect, setHidden } from '../dom.js';
 import { createRouteMap } from '../components/routeMap.js';
 import { computeTripAmounts } from '../../domain/mileage/engine.js';
+import { findNearestPlace } from '../../services/tracks/trackImportService.js';
+import { formatAddressOneLine } from '../../domain/models.js';
+import { normalizeText } from '../../shared/normalize.js';
 import { formatKm, formatMoney } from '../../shared/format.js';
 
 const MOIS = [
@@ -136,8 +139,12 @@ export function createHistoryView({
       .filter((trip) => String(trip.date).startsWith(prefix))
       .sort(
         (a, b) =>
+          // Les journées, de la plus récente à la plus ancienne.
           String(b.date).localeCompare(String(a.date)) ||
-          String(b.createdAt).localeCompare(String(a.createdAt)),
+          // Mais à l'intérieur d'une journée, dans l'ordre de saisie : le
+          // trajet ajouté par le « + » du jour se range SOUS les précédents,
+          // là où le geste le fait attendre.
+          String(a.createdAt).localeCompare(String(b.createdAt)),
       );
   }
 
@@ -215,6 +222,50 @@ export function createHistoryView({
     return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   }
 
+  /**
+   * Une extrémité de trajet, nommée quand elle correspond à un lieu favori.
+   *
+   * Le trajet ne porte que ce qui a été saisi : tantôt « Maison », tantôt
+   * l'adresse complète, selon le jour et la façon dont il est entré. Passer par
+   * le favori uniformise les deux — on lit toujours le nom, puis l'adresse.
+   */
+  function endpointLabel(text, coords) {
+    const place = matchFavorite(text, coords);
+    if (!place) return el('span', { text });
+
+    const address = formatAddressOneLine(place.address);
+    return el('span', { class: 'endpoint-named' }, [
+      el('strong', { text: place.name }),
+      address ? ` ${address}` : null,
+    ]);
+  }
+
+  /**
+   * Rapprochement d'une extrémité avec un lieu favori.
+   *
+   * Les coordonnées d'abord : elles ne dépendent pas de la façon d'écrire une
+   * adresse. Le texte ensuite, pour les trajets saisis sans coordonnées.
+   */
+  function matchFavorite(text, coords) {
+    const places = store.state.favoritePlaces;
+    if (!places.length) return null;
+
+    if (coords && Number.isFinite(coords.latitude) && Number.isFinite(coords.longitude)) {
+      const near = findNearestPlace([coords.latitude, coords.longitude], places);
+      if (near) return near.place;
+    }
+
+    const wanted = normalizeText(text);
+    if (!wanted) return null;
+    return (
+      places.find(
+        (place) =>
+          normalizeText(place.name) === wanted ||
+          normalizeText(formatAddressOneLine(place.address)) === wanted,
+      ) || null
+    );
+  }
+
   function renderTrip(trip, computed) {
     const isOpen = expanded.has(trip.id);
     const company = store.getCompany(trip.companyId);
@@ -227,11 +278,11 @@ export function createHistoryView({
         el('div', { class: 'trip-endpoints' }, [
           el('div', { class: 'trip-endpoint' }, [
             el('span', { class: 'dot', text: 'A' }),
-            el('span', { text: trip.from }),
+            endpointLabel(trip.from, trip.fromCoords),
           ]),
           el('div', { class: 'trip-endpoint' }, [
             el('span', { class: 'dot', text: 'B' }),
-            el('span', { text: trip.to }),
+            endpointLabel(trip.to, trip.toCoords),
           ]),
           el('div', {
             class: 'meta',
