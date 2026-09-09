@@ -53,6 +53,19 @@ function fakeProvider(results, { id = 'fake', onCall = () => {} } = {}) {
   };
 }
 
+/** Doublure rendant des suggestions completes, pour tester le classement. */
+function fakeRichProvider(entries, { id = 'fake' } = {}) {
+  return {
+    id,
+    label: id,
+    attribution: '',
+    suggest: async () =>
+      entries.map((entry, index) =>
+        createSuggestion({ id: `${id}:${index}`, provider: id, ...entry }),
+      ),
+  };
+}
+
 const domicile = createFavoritePlace({
   id: 'p1',
   name: 'Domicile',
@@ -215,6 +228,103 @@ describe('cache reseau', () => {
     await service.search('grenoble');
 
     expect(onCall).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('fusion des annuaires', () => {
+  it('fait remonter le resultat qui repond a la saisie, quelle que soit sa source', async () => {
+    // L'annuaire d'adresses ne connait pas les commerces : interroge sur un nom
+    // d'enseigne, il repond des communes et des routes homonymes. En cascade,
+    // ces reponses hors sujet remplissaient la liste et masquaient l'annuaire
+    // de lieux, seul a connaitre le magasin.
+    const adresses = fakeRichProvider(
+      [
+        { label: 'La Cote-Saint-Andre', secondary: '38260 La Cote-Saint-Andre' },
+        { label: 'Route de Saint Andre la Cote', secondary: '69440 Chabaniere' },
+        { label: 'Route de la Cote Saint-Andre', secondary: '38260 Sardieu' },
+      ],
+      { id: 'ban' },
+    );
+    const lieux = fakeRichProvider(
+      [{ label: 'Bricomarche', secondary: 'Chemin des Moilles, 38260 La Cote-Saint-Andre' }],
+      { id: 'photon' },
+    );
+
+    const service = createAddressSearchService({
+      favoritePlaceRepository: fakeFavorites([]),
+      recentAddressRepository: fakeRecents(),
+      providers: [adresses, lieux],
+    });
+
+    const { suggestions } = await service.search('bricomarche la cote saint andre');
+
+    expect(suggestions[0].label).toBe('Bricomarche');
+    expect(suggestions[0].provider).toBe('photon');
+    // Les reponses de l'annuaire d'adresses restent proposees, en dessous.
+    expect(suggestions.length).toBeGreaterThan(1);
+  });
+
+  it('interroge toutes les sources, meme quand la premiere repond', async () => {
+    const appels = [];
+    const premier = fakeProvider(['Grenoble'], { id: 'ban', onCall: () => appels.push('ban') });
+    const second = fakeProvider(['Grenoble Est'], {
+      id: 'photon',
+      onCall: () => appels.push('photon'),
+    });
+
+    const service = createAddressSearchService({
+      favoritePlaceRepository: fakeFavorites([]),
+      recentAddressRepository: fakeRecents(),
+      providers: [premier, second],
+    });
+
+    await service.search('grenoble');
+
+    expect(appels).toEqual(['ban', 'photon']);
+  });
+
+  it('ne propose qu’une fois un lieu que les deux annuaires decrivent', async () => {
+    // Meme endroit, deux ecritures : la comparaison des textes ne suffit pas,
+    // les coordonnees les rapprochent.
+    const adresses = fakeRichProvider(
+      [{ label: '150 Chemin des Moilles', secondary: '38260 La Cote-Saint-Andre', latitude: 45.3931, longitude: 5.2569 }],
+      { id: 'ban' },
+    );
+    const lieux = fakeRichProvider(
+      [{ label: 'Chemin des Moilles', secondary: '38260 La Cote-Saint-Andre France', latitude: 45.39312, longitude: 5.25691 }],
+      { id: 'photon' },
+    );
+
+    const service = createAddressSearchService({
+      favoritePlaceRepository: fakeFavorites([]),
+      recentAddressRepository: fakeRecents(),
+      providers: [adresses, lieux],
+    });
+
+    const { suggestions } = await service.search('chemin des moilles');
+
+    expect(suggestions).toHaveLength(1);
+    expect(suggestions[0].provider).toBe('ban');
+  });
+
+  it('sert l’annuaire encore debout quand l’autre tombe', async () => {
+    const enPanne = {
+      id: 'ban',
+      suggest: async () => {
+        throw new Error('503');
+      },
+    };
+
+    const service = createAddressSearchService({
+      favoritePlaceRepository: fakeFavorites([]),
+      recentAddressRepository: fakeRecents(),
+      providers: [enPanne, fakeProvider(['Secours'], { id: 'photon' })],
+    });
+
+    const { suggestions, error } = await service.search('grenoble');
+
+    expect(error).toBeNull();
+    expect(suggestions[0].provider).toBe('photon');
   });
 });
 

@@ -8,6 +8,21 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+### Ajouté
+- **Les commerces et les établissements se trouvent par leur nom.** Taper
+  « Bricomarché » proposait jusqu'ici des communes homonymes : l'annuaire
+  d'adresses ne connaît que des rues, et sa réponse — même hors sujet —
+  empêchait d'interroger l'annuaire de lieux. Les deux sources sont désormais
+  consultées ensemble, et la suggestion qui reprend tous les mots saisis passe
+  devant. Le nom accompagne l'adresse jusque dans le champ, puis dans le
+  rapport : « Bricomarché — Chemin des Moilles, 38260 La Côte-Saint-André ».
+  Un même lieu décrit par les deux annuaires n'est proposé qu'une fois.
+
+### Modifié
+- **Coordonnées d'un commerce** : la distance part désormais du point du
+  magasin et non du milieu de la rue.
+- **« France » n'apparaît plus** à la fin d'une adresse française.
+
 ## [0.11.0] — 2026-09-09
 
 ### Ajouté

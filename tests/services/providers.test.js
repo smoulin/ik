@@ -120,6 +120,70 @@ describe('Photon — autocompletion de repli', () => {
     expect(suggestion.city).toBe('Lyon');
     expect(suggestion.provider).toBe('photon');
   });
+
+  it('garde le nom de l’enseigne devant son adresse', async () => {
+    const provider = createPhotonAutocompleteProvider({
+      fetchImpl: async () =>
+        jsonResponse({
+          features: [
+            {
+              geometry: { coordinates: [5.2569, 45.3931] },
+              properties: {
+                osm_id: 7,
+                name: 'Bricomarche',
+                street: 'Chemin des Moilles',
+                postcode: '38260',
+                city: 'La Cote-Saint-Andre',
+                country: 'France',
+                countrycode: 'FR',
+                osm_value: 'doityourself',
+              },
+            },
+          ],
+        }),
+    });
+
+    const [suggestion] = await provider.suggest('bricomarche la cote');
+
+    // Le nom seul en premiere ligne, l'adresse en seconde.
+    expect(suggestion.label).toBe('Bricomarche');
+    // « France » est omis : le pays n'est utile que hors de France.
+    expect(suggestion.secondary).toBe('Chemin des Moilles, 38260 La Cote-Saint-Andre');
+    expect(suggestion.name).toBe('Bricomarche');
+    // C'est ce texte qui est ecrit dans le champ, puis repris par le rapport :
+    // le nom justifie le deplacement la ou l'adresse seule ne dit rien.
+    expect(suggestion.fullLabel).toBe(
+      'Bricomarche — Chemin des Moilles, 38260 La Cote-Saint-Andre',
+    );
+    expect(suggestion.latitude).toBeCloseTo(45.3931, 4);
+  });
+
+  it('ne repete pas la rue quand Photon la renvoie aussi comme nom', async () => {
+    const provider = createPhotonAutocompleteProvider({
+      fetchImpl: async () =>
+        jsonResponse({
+          features: [
+            {
+              geometry: { coordinates: [4.85, 45.75] },
+              properties: {
+                osm_id: 8,
+                name: 'Rue de la Republique',
+                street: 'Rue de la Republique',
+                postcode: '69002',
+                city: 'Lyon',
+                countrycode: 'FR',
+              },
+            },
+          ],
+        }),
+    });
+
+    const [suggestion] = await provider.suggest('rue de la rep');
+
+    expect(suggestion.label).toBe('Rue de la Republique');
+    expect(suggestion.name).toBe('');
+    expect(suggestion.fullLabel).not.toContain('—');
+  });
 });
 
 describe('geocodage', () => {
