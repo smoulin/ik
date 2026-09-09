@@ -65,8 +65,8 @@ function toSuggestion(feature) {
   const postalCode = properties.postcode || '';
   // Le pays n'est mentionne que s'il n'est pas la France : ce libelle part
   // desormais dans le champ puis dans le rapport, ou « France » n'apprend rien.
-  const country = properties.countrycode === 'FR' ? '' : properties.country;
-  const locality = [postalCode, city, country].filter(Boolean).join(' ');
+  const countryLabel = properties.countrycode === 'FR' ? '' : properties.country;
+  const locality = [postalCode, city, countryLabel].filter(Boolean).join(' ');
 
   // Nom de l'etablissement — « Bricomarche ». C'est la raison d'etre de ce
   // fournisseur : l'annuaire d'adresses ne connait que des rues. Photon renvoie

@@ -307,6 +307,29 @@ describe('fusion des annuaires', () => {
     expect(suggestions[0].provider).toBe('ban');
   });
 
+  it('signale la panne plutot que de faire croire a une absence de resultat', async () => {
+    // Un annuaire tombe, l'autre ne trouve rien : la liste est vide, mais pour
+    // une raison que l'utilisateur doit connaitre.
+    const enPanne = {
+      id: 'ban',
+      suggest: async () => {
+        throw new Error('503 Service Unavailable');
+      },
+    };
+
+    const service = createAddressSearchService({
+      favoritePlaceRepository: fakeFavorites([]),
+      recentAddressRepository: fakeRecents(),
+      providers: [enPanne, fakeProvider([], { id: 'photon' })],
+    });
+
+    const { suggestions, error } = await service.search('zzzzzzz');
+
+    expect(suggestions).toEqual([]);
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain('503');
+  });
+
   it('sert l’annuaire encore debout quand l’autre tombe', async () => {
     const enPanne = {
       id: 'ban',

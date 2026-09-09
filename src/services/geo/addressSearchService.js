@@ -117,10 +117,12 @@ export function createAddressSearchService({
     );
 
     if (!merged.length) {
-      // Tous en echec : on remonte l'erreur pour que l'appelant l'affiche.
-      // Zero resultat n'est pas une panne et reste mis en cache.
-      const failed = settled.filter((outcome) => outcome.status === 'rejected');
-      if (failed.length === settled.length && failed.length) throw failed[0].reason;
+      // Une panne ne doit pas passer pour « aucun resultat » : sans rien a
+      // proposer, on remonte l'erreur pour que l'appelant l'affiche. Une
+      // liste vide sans panne, elle, est une reponse valable et se met en
+      // cache.
+      const failed = settled.find((outcome) => outcome.status === 'rejected');
+      if (failed) throw failed.reason;
 
       writeCache(cacheKey, []);
       return [];
