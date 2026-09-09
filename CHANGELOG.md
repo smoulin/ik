@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.12.0] — 2026-09-09
+
 ### Ajouté
 - **Les commerces et les établissements se trouvent par leur nom.** Taper
   « Bricomarché » proposait jusqu'ici des communes homonymes : l'annuaire
