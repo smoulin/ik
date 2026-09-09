@@ -178,6 +178,10 @@ export function createHistoryView({
     renderTotals(trips, computations);
 
     list.replaceChildren();
+    // Detruire, pas seulement oublier : une carte Leaflet dont on lache la
+    // reference laisse ses ecouteurs globaux derriere elle. Un trajet ouvert
+    // est reaffiche a chaque arrivee de trace.
+    maps.forEach((map) => map.destroy());
     maps.clear();
 
     if (!trips.length) {

@@ -35,6 +35,7 @@ export function createRouteMap(container) {
   let map = null;
   let routeLayer = null;
   let markersLayer = null;
+  let resizeTimer = null;
 
   /**
    * Affiche un trace. Cree la carte au premier appel seulement.
@@ -76,7 +77,10 @@ export function createRouteMap(container) {
     );
 
     // Leaflet calcule mal ses dimensions si le conteneur vient d'etre affiche.
-    setTimeout(() => map.invalidateSize(), 60);
+    // Le report est annule par destroy() : sans cela, une carte fermee ou
+    // reaffichee dans l'intervalle laisse l'appel s'executer sur du vide.
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => map?.invalidateSize(), 60);
   }
 
   function markerStyle(color) {
@@ -85,6 +89,7 @@ export function createRouteMap(container) {
 
   /** Libere la carte : utile quand le formulaire est reinitialise. */
   function destroy() {
+    clearTimeout(resizeTimer);
     if (map) {
       map.remove();
       map = null;

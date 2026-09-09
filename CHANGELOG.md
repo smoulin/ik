@@ -8,6 +8,30 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.11.0] — 2026-09-09
+
+### Ajouté
+- **Le tracé réel s'affiche sur la carte** quand on ouvre un trajet dans
+  l'historique, à la place du simple segment reliant le départ à l'arrivée.
+  L'itinéraire n'est pas stocké sur le trajet : il est demandé à l'ouverture et
+  gardé le temps de la session, pour ne pas alourdir chaque sauvegarde de
+  milliers de points. Hors réseau, la ligne droite reste affichée.
+- **Le nom d'un lieu favori accompagne son adresse** dans les champs Départ et
+  Arrivée : choisir « Maison » inscrit « Maison — 358 Chemin de l'Étang, 38980
+  Châtenay », et non plus l'adresse seule.
+
+### Modifié
+- **Sens des flèches de l'historique** : la flèche de gauche avance d'un mois,
+  celle de droite recule, dans le sens de lecture de la frise.
+- **Retour à l'historique après modification d'un trajet** : l'écran de saisie se
+  referme sur le trajet corrigé, déplié, au lieu de rester sur le formulaire.
+
+### Corrigé
+- **Cartes non libérées** : refermer un trajet, ou le réafficher, laissait
+  derrière lui une carte détachée et ses écouteurs. Une erreur pouvait aussi
+  survenir quand la carte était fermée dans la seconde suivant son ouverture.
+  Sans effet visible, mais la mémoire grimpait au fil des consultations.
+
 ## [0.10.0] — 2026-09-08
 
 ### Ajouté
