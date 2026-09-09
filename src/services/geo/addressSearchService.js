@@ -86,8 +86,14 @@ export function createAddressSearchService({
   }
 
   /**
-   * Interroge les fournisseurs en cascade : le premier qui repond gagne.
-   * Une panne du fournisseur principal bascule silencieusement sur le repli.
+   * Interroge tous les fournisseurs ensemble, puis fusionne leurs reponses.
+   *
+   * Les deux annuaires ne savent pas la meme chose : celui des adresses ignore
+   * les commerces, celui des lieux les connait mais couvre moins bien les
+   * rues. En cascade, le premier a repondre masquait l'autre — chercher
+   * « Bricomarche » ne rendait que des communes homonymes.
+   *
+   * Une panne isolee reste invisible : l'annuaire encore debout sert seul.
    */
   async function searchProviders(query, limit, signal) {
     if (limit <= 0 || !providers.length) return [];
@@ -96,28 +102,58 @@ export function createAddressSearchService({
     const cached = readCache(cacheKey);
     if (cached) return cached;
 
-    let lastError = null;
-    for (const provider of providers) {
-      try {
-        const results = await provider.suggest(query, { limit, signal });
-        if (results.length) {
-          writeCache(cacheKey, results);
-          return results;
-        }
-      } catch (error) {
-        // Une saisie poursuivie annule la requete : ce n'est pas une panne.
-        if (error?.name === 'AbortError') throw error;
-        lastError = error;
-      }
+    const settled = await Promise.allSettled(
+      providers.map((provider) => provider.suggest(query, { limit, signal })),
+    );
+
+    // Une saisie poursuivie annule les requetes : ce n'est pas une panne.
+    const aborted = settled.find(
+      (outcome) => outcome.status === 'rejected' && outcome.reason?.name === 'AbortError',
+    );
+    if (aborted) throw aborted.reason;
+
+    const merged = settled.flatMap((outcome) =>
+      outcome.status === 'fulfilled' ? outcome.value : [],
+    );
+
+    if (!merged.length) {
+      // Une panne ne doit pas passer pour « aucun resultat » : sans rien a
+      // proposer, on remonte l'erreur pour que l'appelant l'affiche. Une
+      // liste vide sans panne, elle, est une reponse valable et se met en
+      // cache.
+      const failed = settled.find((outcome) => outcome.status === 'rejected');
+      if (failed) throw failed.reason;
+
+      writeCache(cacheKey, []);
+      return [];
     }
 
-    // Tous les fournisseurs ont echoue : on remonte l'erreur pour que
-    // l'appelant puisse l'afficher. Un resultat vide n'est pas une panne et
-    // reste mis en cache.
-    if (lastError) throw lastError;
+    const ranked = rankByQuery(merged, query);
+    writeCache(cacheKey, ranked);
+    return ranked;
+  }
 
-    writeCache(cacheKey, []);
-    return [];
+  /**
+   * Classe les reponses fusionnees par pertinence apparente.
+   *
+   * Seule regle : une suggestion qui contient TOUS les mots saisis passe
+   * devant celles qui n'en contiennent qu'une partie. C'est ce qui fait
+   * remonter « Bricomarche, 38260 La Cote-Saint-Andre » au-dessus des
+   * « Route de Saint-Andre » que l'annuaire d'adresses renvoie pour la meme
+   * saisie. Sans ce classement, la fusion ne servirait a rien : les reponses
+   * hors sujet remplissent a elles seules la liste.
+   *
+   * A pertinence egale, l'ordre des fournisseurs est conserve.
+   */
+  function rankByQuery(suggestions, query) {
+    return suggestions
+      .map((suggestion, index) => ({
+        suggestion,
+        index,
+        rank: matchesAllWords(`${suggestion.label} ${suggestion.secondary}`, query) ? 0 : 1,
+      }))
+      .sort((a, b) => a.rank - b.rank || a.index - b.index)
+      .map((entry) => entry.suggestion);
   }
 
   /**
@@ -137,7 +173,19 @@ export function createAddressSearchService({
     const push = (suggestion) => {
       const key = normalizeText(suggestion.fullLabel || suggestion.label);
       if (!key || seen.has(key)) return;
+
+      // Deux annuaires ecrivent rarement une adresse de la meme facon, mais
+      // ils la situent au meme endroit. La grille au dix-millieme de degre
+      // vaut une dizaine de metres : assez fin pour ne pas confondre deux
+      // commerces voisins, assez large pour reconnaitre une meme adresse.
+      const spot =
+        Number.isFinite(suggestion.latitude) && Number.isFinite(suggestion.longitude)
+          ? `@${suggestion.latitude.toFixed(4)},${suggestion.longitude.toFixed(4)}`
+          : null;
+      if (spot && seen.has(spot)) return;
+
       seen.add(key);
+      if (spot) seen.add(spot);
       output.push(suggestion);
     };
 

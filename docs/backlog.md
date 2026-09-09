@@ -153,3 +153,10 @@ sync` ne régénère pas les icônes, il faut écrire dans `res/` puis reconstru
 
 **Validation** : l'icône du lanceur sur le téléphone montre le monogramme
 Agilmea, et `aapt2 dump badging` liste bien les densités attendues.
+
+## Les coordonnées d'une suggestion sont perdues dès qu'on retouche le champ
+
+`tripView.js` remet `fromCoords` / `toCoords` à `null` sur chaque `input`.
+Corriger une faute de frappe après avoir choisi une suggestion fait donc
+retomber le calcul sur un géocodage du texte entier, moins précis que le point
+retenu. Sans effet tant qu'on sélectionne dans la liste sans y revenir.
