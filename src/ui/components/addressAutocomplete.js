@@ -110,13 +110,13 @@ export function attachAddressAutocomplete(input, { service, onSelect = () => {},
   }
 
   /**
-   * Deuxieme ligne : toujours l'adresse complete telle qu'elle sera reprise.
-   * Pour un favori, c'est ce qui leve le doute sur le contenu du champ.
+   * Deuxieme ligne : l'adresse seule.
+   *
+   * Pour un favori, la premiere ligne porte deja son nom : reprendre ici le
+   * libelle complet — qui contient desormais le nom ET l'adresse — le
+   * repeterait sous lui-meme.
    */
   function detailLabel(suggestion) {
-    if (suggestion.source === 'favorite') {
-      return suggestion.fullLabel || suggestion.secondary || '';
-    }
     return suggestion.secondary || '';
   }
 

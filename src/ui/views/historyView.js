@@ -33,11 +33,21 @@ const MOIS = [
 
 export function createHistoryView({
   store,
+  geo = null,
   onEdit,
   onDuplicate,
   onAddForDate = () => {},
   onChanged = () => {},
 }) {
+  /**
+   * Traces d'itineraire deja calculees, le temps de la session.
+   *
+   * Un trajet ne stocke pas son trace : le conserver alourdirait la base et
+   * chaque sauvegarde de quelques milliers de points par trajet. Il est donc
+   * recalcule a l'ouverture de la carte, puis retenu ici pour qu'un second
+   * depliage soit instantane.
+   */
+  const routeCache = new Map();
   const companyFilter = byId('historyCompany');
   const list = byId('historyList');
   const totals = byId('historyTotals');
@@ -54,8 +64,11 @@ export function createHistoryView({
   const maps = new Map();
 
   companyFilter.addEventListener('change', render);
-  byId('prevPeriodBtn').addEventListener('click', () => shiftPeriod(-1));
-  byId('nextPeriodBtn').addEventListener('click', () => shiftPeriod(1));
+  // Sens demandé par l'utilisateur, inverse de la convention habituelle : la
+  // flèche de gauche avance dans le temps. Les libellés d'accessibilité, dans
+  // index.html, ont été inversés avec elle pour ne pas annoncer le contraire.
+  byId('prevPeriodBtn').addEventListener('click', () => shiftPeriod(1));
+  byId('nextPeriodBtn').addEventListener('click', () => shiftPeriod(-1));
   byId('todayBtn').addEventListener('click', () => {
     cursor = new Date();
     render();
@@ -165,6 +178,10 @@ export function createHistoryView({
     renderTotals(trips, computations);
 
     list.replaceChildren();
+    // Detruire, pas seulement oublier : une carte Leaflet dont on lache la
+    // reference laisse ses ecouteurs globaux derriere elle. Un trajet ouvert
+    // est reaffiche a chaque arrivee de trace.
+    maps.forEach((map) => map.destroy());
     maps.clear();
 
     if (!trips.length) {
@@ -300,7 +317,8 @@ export function createHistoryView({
       ],
     );
 
-    const card = el('div', { class: 'trip-card' }, [summary]);
+    // L'identifiant sert à ramener le trajet sous les yeux après modification.
+    const card = el('div', { class: 'trip-card', id: `trip-${trip.id}` }, [summary]);
     if (isOpen) card.append(renderDetails(trip, computed));
     return card;
   }
@@ -321,22 +339,73 @@ export function createHistoryView({
 
     // La carte n'existe que si le trajet porte des coordonnées résolues.
     if (trip.fromCoords && trip.toCoords) {
-      const map = createRouteMap(mapNode);
-      maps.set(trip.id, map);
-      map
-        .show(
-          [
-            [trip.fromCoords.latitude, trip.fromCoords.longitude],
-            [trip.toCoords.latitude, trip.toCoords.longitude],
-          ],
-          { from: trip.from, to: trip.to },
-        )
-        .catch(() => setHidden(mapNode, true));
+      showRoute(trip, mapNode);
     } else {
       setHidden(mapNode, true);
     }
 
     return details;
+  }
+
+  /**
+   * Carte d'un trajet : la route réellement suivie, pas la corde.
+   *
+   * Les deux extrémités s'affichent d'abord — c'est immédiat et cela ne dépend
+   * de rien. L'itinéraire les remplace ensuite, quand il arrive. Sans réseau,
+   * la ligne droite reste : mieux vaut une carte approximative que pas de carte.
+   */
+  function showRoute(trip, mapNode) {
+    const ends = [
+      [trip.fromCoords.latitude, trip.fromCoords.longitude],
+      [trip.toCoords.latitude, trip.toCoords.longitude],
+    ];
+    const labels = { from: trip.from, to: trip.to };
+
+    const map = createRouteMap(mapNode);
+    maps.set(trip.id, map);
+
+    const draw = (points) => map.show(points, labels).catch(() => setHidden(mapNode, true));
+
+    const known = routeCache.get(trip.id);
+    if (known) {
+      draw(known);
+      return;
+    }
+
+    draw(ends);
+    if (!geo?.distanceService) return;
+
+    geo.distanceService
+      .computeTripDistance({
+        from: trip.from,
+        to: trip.to,
+        fromCoords: trip.fromCoords,
+        toCoords: trip.toCoords,
+        // L'aller suffit : le retour emprunte le même tracé à l'écran.
+        roundTrip: false,
+        preference: trip.routePreference,
+      })
+      .then((route) => {
+        if (!route.geometry?.length) return;
+        routeCache.set(trip.id, route.geometry);
+        /*
+         * On redessine par un réaffichage, et non sur la carte courante : un
+         * `render()` peut survenir pendant la requête, et l'ancienne carte se
+         * retrouve alors détachée du document — le tracé y serait dessiné pour
+         * personne. Le cache, lui, survit au réaffichage, et `showRoute` le
+         * consulte avant de relancer quoi que ce soit : aucune boucle possible.
+         */
+        if (expanded.has(trip.id)) render();
+      })
+      .catch(() => {});
+  }
+
+  /** Déplie un trajet et l'amène sous les yeux — après une modification. */
+  function openTrip(id) {
+    expanded.add(id);
+    render();
+    // Le rendu vient d'avoir lieu : l'élément existe.
+    document.getElementById(`trip-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function toggle(id) {
@@ -385,5 +454,5 @@ export function createHistoryView({
     render();
   }
 
-  return { refresh };
+  return { refresh, openTrip };
 }
