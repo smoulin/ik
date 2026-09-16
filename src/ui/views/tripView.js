@@ -41,6 +41,8 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
   let editingId = null;
   /** Trace GPS a l'origine du brouillon, marquee comme traitee a l'enregistrement. */
   let draftTrackId = null;
+  /** Distance mesuree par le GPS : la reference, qu'aucun calcul ne doit ecraser. */
+  let measuredByGps = false;
   let calculating = false;
 
   /** Trace du dernier calcul, conservee pour l'affichage a la demande. */
@@ -259,6 +261,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     fields.routePreference.value = 'fastest';
     lastGeometry = null;
     lastOneWayKm = null;
+    measuredByGps = false;
     if (recalcTimer !== null) {
       clearTimeout(recalcTimer);
       recalcTimer = null;
@@ -295,6 +298,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     fromCoords = draft.fromCoords || null;
     toCoords = draft.toCoords || null;
     draftTrackId = draft.trackId || null;
+    measuredByGps = true;
 
     setHidden(cancelBtn, false);
     showStatus('Trajet enregistré par le GPS : complète le motif puis valide.', '');
@@ -317,6 +321,10 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     fields.routePreference.value = trip.routePreference || 'fastest';
     fromCoords = trip.fromCoords;
     toCoords = trip.toCoords;
+    // La distance aller du trajet precedemment calcule ne vaut pas pour
+    // celui-ci : sans cette remise a zero, cocher « Aller-retour » la doublait.
+    lastOneWayKm = null;
+    measuredByGps = trip.distanceSource === 'gps';
 
     saveBtn.textContent = 'Enregistrer les modifications';
     setHidden(cancelBtn, false);
@@ -341,6 +349,10 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     fields.routePreference.value = trip.routePreference || 'fastest';
     fromCoords = trip.fromCoords;
     toCoords = trip.toCoords;
+    // La distance aller du trajet precedemment calcule ne vaut pas pour
+    // celui-ci : sans cette remise a zero, cocher « Aller-retour » la doublait.
+    lastOneWayKm = null;
+    measuredByGps = trip.distanceSource === 'gps';
 
     saveBtn.textContent = 'Enregistrer le trajet';
     setHidden(cancelBtn, false);
@@ -441,10 +453,18 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
   cancelBtn.addEventListener('click', reset);
   mapBtn.addEventListener('click', toggleMap);
 
-  // Aller-retour : la distance aller est deja connue, un simple facteur suffit.
-  // Aucun appel reseau, donc reponse immediate.
+  // Aller-retour : si la distance aller est connue, un simple facteur suffit,
+  // sans reseau. Sinon on lance le calcul — cocher la case sans avoir clique
+  // « Calculer » ne produisait rien.
   fields.roundTrip.addEventListener('change', () => {
-    if (lastOneWayKm === null) return;
+    if (lastOneWayKm === null) {
+      // Une distance mesuree par le GPS est la reference : un itineraire
+      // theorique ne doit pas l'ecraser.
+      if (measuredByGps) return;
+      if (!fields.from.value.trim() || !fields.to.value.trim()) return;
+      calculateDistance();
+      return;
+    }
     const km = fields.roundTrip.checked ? lastOneWayKm * 2 : lastOneWayKm;
     fields.km.value = formatDecimalInput(Math.round(km * 10) / 10, 1);
     const sens = fields.roundTrip.checked ? 'Aller-retour' : 'Aller simple';
