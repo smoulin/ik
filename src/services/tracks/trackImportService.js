@@ -129,7 +129,7 @@ export function createTrackImportService({
       const end = rematch(track.end, places);
       if (!start.changed && !end.changed) continue;
 
-      await trackRepository.save({ ...track, start: start.endpoint, end: end.endpoint });
+      if (!(await writeEndpoints(track, start.endpoint, end.endpoint))) continue;
       track.start = start.endpoint;
       track.end = end.endpoint;
       changed += 1;
@@ -159,7 +159,7 @@ export function createTrackImportService({
       const end = await describeEndpointAddress(track.end);
       if (!start.changed && !end.changed) continue;
 
-      await trackRepository.save({ ...track, start: start.endpoint, end: end.endpoint });
+      if (!(await writeEndpoints(track, start.endpoint, end.endpoint))) continue;
       // La trace en memoire suit l'enregistrement : l'appelant affiche souvent
       // la liste qu'il vient de passer, sans la relire.
       track.start = start.endpoint;
@@ -168,6 +168,24 @@ export function createTrackImportService({
     }
 
     return named;
+  }
+
+  /**
+   * Ecrit les extremites d'une trace, a condition qu'elle soit toujours en attente.
+   *
+   * La copie en memoire peut etre perimee : le nommage attend le reseau, et la
+   * trace a pu etre supprimee, validee ou ecartee comme trajet personnel
+   * entre-temps. Repartir de cette copie ecrasait la marque vide et faisait
+   * revenir le trajet avec ses lieux et ses horaires. On relit donc la base
+   * juste avant d'ecrire, et on ne touche qu'aux extremites.
+   *
+   * @returns {Promise<boolean>} vrai si l'ecriture a eu lieu
+   */
+  async function writeEndpoints(track, start, end) {
+    const current = await trackRepository.get(track.id);
+    if (!current || current.deletedAt || current.status !== 'pending') return false;
+    await trackRepository.save({ ...current, start, end });
+    return true;
   }
 
   /**

@@ -212,6 +212,50 @@ describe('nameEndpoints', () => {
     expect(stored.end.label).toBe(ADRESSE);
   });
 
+  /*
+   * Le nommage attend le reseau. Si le trajet est supprime entre-temps, son
+   * ecriture tardive ne doit pas le faire revenir : elle repartait de la trace
+   * gardee en memoire, encore « en attente », et ecrasait la marque vide.
+   */
+  it('ne ressuscite pas un trajet supprime pendant la recherche d’adresse', async () => {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const service = serviceWith(async () => {
+      await gate;
+      return { label: ADRESSE, provider: 'ban' };
+    });
+    const track = await service.importGpx({ name: 't.gpx', text: GPX });
+
+    const naming = service.nameEndpoints([track]);
+    await trackRepository.save({ ...track, deletedAt: '2026-09-16T10:00:00.000Z' });
+    release();
+    await naming;
+
+    const stored = await trackRepository.get(track.id);
+    expect(stored.deletedAt).toBe('2026-09-16T10:00:00.000Z');
+    expect(stored.start).toBeNull();
+    expect(stored.startedAt).toBe('');
+  });
+
+  it('ne ressuscite pas un trajet supprime lors du rapprochement des favoris', async () => {
+    const service = serviceWith(null);
+    const track = await service.importGpx({ name: 't.gpx', text: GPX });
+    const [lat, lon] = [track.start.latitude, track.start.longitude];
+    await favoritePlaceRepository.save({ name: 'Maison', latitude: lat, longitude: lon });
+
+    // Copie en memoire, perimee : la trace a ete supprimee depuis.
+    const enMemoire = { ...track };
+    await trackRepository.save({ ...track, deletedAt: '2026-09-16T10:00:00.000Z' });
+
+    await service.matchFavorites([enMemoire]);
+
+    const stored = await trackRepository.get(track.id);
+    expect(stored.deletedAt).toBe('2026-09-16T10:00:00.000Z');
+    expect(stored.start).toBeNull();
+  });
+
   // R10 — un échec de nommage ne doit jamais faire perdre un trajet.
   it('conserve la trace quand le nommage échoue', async () => {
     const service = serviceWith(async () => {
