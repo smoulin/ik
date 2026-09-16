@@ -23,6 +23,7 @@ import {
   readiness,
 } from '../../services/tracks/nativeRecorder.js';
 import { openRecorderSetup } from '../components/recorderSetup.js';
+import { attachSwipeToDelete } from '../components/swipeToDelete.js';
 import { favoritePlaceRepository, personalRouteRepository } from '../../data/repositories/index.js';
 import { computeTripAmounts } from '../../domain/mileage/engine.js';
 import { toKilometers } from '../../domain/tracks/trackDistance.js';
@@ -336,8 +337,13 @@ export function createHomeView({ store, geo = null, onChanged = () => {}, onEdit
     );
 
     const card = el('div', { class: 'trip-card' }, [summary]);
-    if (isOpen) card.append(renderDetails(track, km));
-    return card;
+    if (isOpen) {
+      card.append(renderDetails(track, km));
+      // Une carte depliee se manipule par ses boutons : le geste y provoquait
+      // des ouvertures fortuites en faisant defiler la carte ou le detail.
+      return card;
+    }
+    return attachSwipeToDelete(card, { onDelete: () => ignore(track, { confirm: false }) });
   }
 
   function endpointLine(letter, endpoint, isoTime) {
