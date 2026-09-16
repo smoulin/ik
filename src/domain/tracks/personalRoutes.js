@@ -18,7 +18,16 @@ export function routeFromTrack(track) {
   const a = spot(track?.start);
   const b = spot(track?.end);
   if (!a || !b) return null;
+  // Une boucle qui revient a son depart donnerait deux lieux confondus : la
+  // regle ecarterait toute boucle partant de la, tournee professionnelle
+  // comprise, et sans retour possible. Au-dela de deux rayons, les deux zones
+  // ne se chevauchent plus.
+  if (distance(a, b) <= 2 * PERSONAL_ROUTE_RADIUS_M) return null;
   return { a, b };
+}
+
+function distance(p, q) {
+  return haversineMeters([p.latitude, p.longitude], [q.latitude, q.longitude]);
 }
 
 export function matchesPersonalRoute(track, route, radius = PERSONAL_ROUTE_RADIUS_M) {
@@ -27,8 +36,7 @@ export function matchesPersonalRoute(track, route, radius = PERSONAL_ROUTE_RADIU
   const end = spot(track?.end);
   if (!start || !end || !spot(route.a) || !spot(route.b)) return false;
 
-  const near = (p, q) =>
-    haversineMeters([p.latitude, p.longitude], [q.latitude, q.longitude]) <= radius;
+  const near = (p, q) => distance(p, q) <= radius;
 
   return (
     (near(start, route.a) && near(end, route.b)) || (near(start, route.b) && near(end, route.a))

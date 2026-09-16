@@ -191,7 +191,9 @@ async function mergeTracks(incoming, exportedAt) {
   for (const record of records) {
     const mine = local.get(record.id);
 
-    if (record.deletedAt) {
+    // Une version anterieure ignorait une trace sans la dater comme supprimee :
+    // c'est pourtant une suppression, et elle doit l'emporter de meme.
+    if (record.deletedAt || record.status === 'ignored') {
       // Suppression recue : la trace part, et aucune marque ne reste ici.
       if (mine) {
         await trackRepository.remove(record.id, { hard: true });
@@ -217,8 +219,9 @@ async function mergeTracks(incoming, exportedAt) {
   }
 
   // Marques emises ici : l'autre appareil a-t-il traite la suppression ? Seul
-  // un fichier exporte APRES elle peut le prouver, par l'absence de la trace.
-  if (exportedAt) {
+  // un fichier exporte APRES elle, et qui transporte les traces, peut le
+  // prouver par leur absence. Un fichier muet sur les traces ne prouve rien.
+  if (exportedAt && Array.isArray(incoming)) {
     for (const mine of local.values()) {
       if (!mine.deletedAt || remote.has(mine.id)) continue;
       if (String(exportedAt) > String(mine.deletedAt)) {

@@ -544,7 +544,13 @@ export function createHomeView({ store, geo = null, onChanged = () => {}, onEdit
   async function markPersonal(track) {
     const route = routeFromTrack(track);
     if (!route) {
-      setStatus('Lieu de départ ou d’arrivée inconnu : ce trajet ne peut pas être mémorisé.', 'bad');
+      const located = Number.isFinite(track.start?.latitude) && Number.isFinite(track.end?.latitude);
+      setStatus(
+        located
+          ? 'Ce trajet revient à son point de départ : il ne peut pas servir de trajet personnel.'
+          : 'Lieu de départ ou d’arrivée inconnu : ce trajet ne peut pas être mémorisé.',
+        'bad',
+      );
       return;
     }
     await store.savePersonalRoute(route);

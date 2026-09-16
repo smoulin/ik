@@ -24,6 +24,13 @@ describe('routeFromTrack', () => {
     expect(route.b).toEqual({ latitude: 45.11, longitude: 5.1, label: 'Salle de sport' });
   });
 
+  it('refuse une boucle qui revient a son point de depart', () => {
+    // Une telle regle ecarterait toute boucle partant de ce lieu, y compris
+    // une tournee professionnelle — sans retour possible.
+    expect(routeFromTrack(track(HOME, near(HOME)))).toBeNull();
+    expect(routeFromTrack(track(HOME, { ...HOME, latitude: HOME.latitude + 0.0035 }))).toBeNull();
+  });
+
   it('refuse une trace sans coordonnees exploitables', () => {
     expect(routeFromTrack(track(null, GYM))).toBeNull();
     expect(routeFromTrack(track({ latitude: NaN, longitude: 5 }, GYM))).toBeNull();

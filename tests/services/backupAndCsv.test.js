@@ -524,6 +524,26 @@ describe('marques de suppression des traces', () => {
     expect(await trackRepository.list({ includeDeleted: true })).toHaveLength(1);
   });
 
+  it('traite une trace ignoree par une ancienne version comme une suppression', async () => {
+    const vivante = await trackRepository.save(trace());
+    // Renommee ici apres l'export de l'autre appareil : updatedAt plus recent.
+    await trackRepository.save({ ...vivante, updatedAt: '2099-01-01T00:00:00.000Z' });
+
+    const ancienFormat = { ...vivante, status: 'ignored', deletedAt: null, updatedAt: '2026-09-16T09:00:00.000Z' };
+    await mergeBackup(fichier('2026-09-16T10:00:00.000Z', [ancienFormat]));
+
+    expect(await trackRepository.list()).toHaveLength(0);
+  });
+
+  it('ne purge rien avec un fichier qui ne transporte pas les traces', async () => {
+    const vivante = await trackRepository.save(trace());
+    await trackRepository.save({ ...vivante, deletedAt: '2026-09-16T10:00:00.000Z' });
+
+    await mergeBackup({ format: 'agilmea-ik-backup', schemaVersion: 2, exportedAt: '2026-09-16T12:00:00.000Z' });
+
+    expect(await trackRepository.list({ includeDeleted: true })).toHaveLength(1);
+  });
+
   // R22
   it('ne ressuscite pas une trace supprimee meme si l’autre version est plus recente', async () => {
     const vivante = await trackRepository.save(trace());
