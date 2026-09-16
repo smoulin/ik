@@ -17,11 +17,12 @@ import {
   favoritePlaceRepository,
   beneficiaryRepository,
   trackRepository,
+  personalRouteRepository,
   settingsRepository,
 } from '../../data/repositories/index.js';
 
 export async function buildBackup({ appVersion = '' } = {}) {
-  const [companies, vehicles, trips, favoritePlaces, beneficiaries, tracks, settings] =
+  const [companies, vehicles, trips, favoritePlaces, beneficiaries, tracks, personalRoutes, settings] =
     await Promise.all([
       companyRepository.list({ includeDeleted: true }),
       vehicleRepository.list({ includeDeleted: true }),
@@ -29,6 +30,7 @@ export async function buildBackup({ appVersion = '' } = {}) {
       favoritePlaceRepository.list({ includeDeleted: true }),
       beneficiaryRepository.list({ includeDeleted: true }),
       trackRepository.list({ includeDeleted: true }),
+      personalRouteRepository.list({ includeDeleted: true }),
       settingsRepository.all(),
     ]);
 
@@ -46,6 +48,7 @@ export async function buildBackup({ appVersion = '' } = {}) {
     // travail a ne pas perdre : sans elles dans le fichier, un telephone perdu
     // emportait definitivement tous les trajets restant a valider.
     tracks,
+    personalRoutes,
     settings,
   };
 }
@@ -71,6 +74,8 @@ export function inspectBackup(data) {
         // doit pouvoir distinguer « aucune trace » de « le fichier n'en parle
         // pas », faute de quoi une restauration effacerait celles en cours.
         tracks: Array.isArray(data.tracks) ? data.tracks.length : null,
+        // Meme distinction pour les trajets personnels, apparus plus tard.
+        personalRoutes: Array.isArray(data.personalRoutes) ? data.personalRoutes.length : null,
       },
     };
   }
@@ -88,6 +93,7 @@ export function inspectBackup(data) {
         // Le format v0.1.1 ignorait les traces : il n'en annonce donc aucune,
         // ce qui n'est pas la meme chose que d'en annoncer zero.
         tracks: null,
+        personalRoutes: null,
       },
     };
   }
@@ -152,6 +158,7 @@ const MERGEABLE = {
   favoritePlaces: favoritePlaceRepository,
   beneficiaries: beneficiaryRepository,
   tracks: trackRepository,
+  personalRoutes: personalRouteRepository,
 };
 
 /**
@@ -232,6 +239,13 @@ export async function restoreBackup(data) {
   if (Array.isArray(payload.tracks)) {
     await trackRepository.clear();
     await trackRepository.saveMany(payload.tracks);
+  }
+
+  // Meme prudence que pour les traces : un fichier anterieur aux trajets
+  // personnels ne dit pas « aucune regle », il ne dit rien.
+  if (Array.isArray(payload.personalRoutes)) {
+    await personalRouteRepository.clear();
+    await personalRouteRepository.saveMany(payload.personalRoutes);
   }
 
   // Les reglages restaures se limitent au beneficiaire principal : reimporter

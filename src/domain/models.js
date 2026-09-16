@@ -348,6 +348,34 @@ export function createFavoritePlace(input = {}) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Trajet personnel                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Deux lieux entre lesquels un trajet n'est jamais professionnel. La regle de
+ * correspondance vit dans domain/tracks/personalRoutes.js ; ce modele ne fait
+ * que normaliser ce qui est stocke.
+ */
+export function createPersonalRoute(input = {}) {
+  return withMeta(
+    {
+      a: routeSpot(input.a),
+      b: routeSpot(input.b),
+    },
+    input,
+    'route',
+  );
+}
+
+function routeSpot(spot) {
+  return {
+    latitude: num(spot?.latitude),
+    longitude: num(spot?.longitude),
+    label: str(spot?.label),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Trace GPS                                                           */
 /* ------------------------------------------------------------------ */
 

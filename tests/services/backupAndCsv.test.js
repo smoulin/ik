@@ -26,6 +26,7 @@ import {
   favoritePlaceRepository,
   beneficiaryRepository,
   trackRepository,
+  personalRouteRepository,
   settingsRepository,
 } from '../../src/data/repositories/index.js';
 import { buildReport } from '../../src/domain/reporting/reportModel.js';
@@ -430,6 +431,59 @@ describe('fusion de sauvegardes', () => {
 
     expect(counts.tracks.added).toBe(1);
     expect(await trackRepository.list()).toHaveLength(1);
+  });
+});
+
+/*
+ * Trajets personnels : une regle creee sur le telephone doit exister aussi dans
+ * le navigateur, et sa suppression s'y propager.
+ */
+describe('trajets personnels dans la sauvegarde', () => {
+  const regle = (overrides = {}) => ({
+    a: { latitude: 45.1, longitude: 5.1, label: 'Maison' },
+    b: { latitude: 45.11, longitude: 5.1, label: 'Salle de sport' },
+    ...overrides,
+  });
+
+  it('les emporte et les restaure', async () => {
+    const origine = await personalRouteRepository.save(regle());
+    const backup = await buildBackup({ appVersion: 'test' });
+    expect(backup.personalRoutes).toHaveLength(1);
+    expect(inspectBackup(backup).counts.personalRoutes).toBe(1);
+
+    await personalRouteRepository.clear();
+    await restoreBackup(backup);
+
+    const [restauree] = await personalRouteRepository.list();
+    expect(restauree.id).toBe(origine.id);
+    expect(restauree.b.label).toBe('Salle de sport');
+  });
+
+  it('ne les efface pas quand le fichier n’en parle pas', async () => {
+    await personalRouteRepository.save(regle());
+    const backup = await buildBackup({ appVersion: 'test' });
+    delete backup.personalRoutes;
+
+    await restoreBackup(backup);
+
+    expect(await personalRouteRepository.list()).toHaveLength(1);
+    expect(inspectBackup(backup).counts.personalRoutes).toBeNull();
+  });
+
+  it('propage par fusion une regle creee et une regle supprimee ailleurs', async () => {
+    const gardee = await personalRouteRepository.save(regle());
+    const supprimee = await personalRouteRepository.save(
+      regle({ a: { latitude: 45.3, longitude: 5.3, label: 'Ecole' } }),
+    );
+    await personalRouteRepository.remove(supprimee.id);
+    const backup = await buildBackup({ appVersion: 'test' });
+
+    await resetDatabase();
+    const counts = await mergeBackup(backup);
+
+    expect(counts.personalRoutes.added).toBe(2);
+    const actives = await personalRouteRepository.list();
+    expect(actives.map((r) => r.id)).toEqual([gardee.id]);
   });
 });
 
