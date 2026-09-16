@@ -138,6 +138,7 @@ export async function mergeBackup(data) {
   for (const [key, repository] of Object.entries(MERGEABLE)) {
     summary[key] = await mergeCollection(repository, data[key]);
   }
+  summary.tracks = await mergeTracks(data.tracks, data.exportedAt);
 
   // Les reglages ne portent pas de date : on ne reprend que le beneficiaire
   // principal, et seulement s'il n'y en a pas deja un. Ecraser un choix local
@@ -157,9 +158,80 @@ const MERGEABLE = {
   trips: tripRepository,
   favoritePlaces: favoritePlaceRepository,
   beneficiaries: beneficiaryRepository,
-  tracks: trackRepository,
   personalRoutes: personalRouteRepository,
 };
+
+/**
+ * Traces : meme fusion que les autres collections, plus la vie des marques de
+ * suppression.
+ *
+ * Une marque n'existe que pour prevenir l'autre appareil. Des qu'il est
+ * prevenu, elle n'a plus d'objet et disparait — decision de l'utilisateur :
+ *  - l'appareil qui RECOIT une suppression retire la trace sans garder de marque ;
+ *  - l'appareil qui l'a EMISE efface sa marque quand il recoit un fichier de
+ *    l'autre cote, exporte apres la suppression, ou la trace n'existe plus.
+ *
+ * Une suppression l'emporte toujours sur une trace vivante : le renommage
+ * automatique des extremites modifie `updatedAt` sans que personne ait voulu
+ * annuler la suppression.
+ *
+ * Limite assumee : fusionner un fichier anterieur a la suppression, une fois
+ * les marques effacees, fait revenir la trace.
+ */
+async function mergeTracks(incoming, exportedAt) {
+  const counts = { added: 0, updated: 0, ignored: 0, purged: 0 };
+  const records = Array.isArray(incoming) ? incoming.filter((record) => record?.id) : [];
+
+  const local = new Map(
+    (await trackRepository.list({ includeDeleted: true })).map((record) => [record.id, record]),
+  );
+  const remote = new Map(records.map((record) => [record.id, record]));
+  const winners = [];
+
+  for (const record of records) {
+    const mine = local.get(record.id);
+
+    if (record.deletedAt) {
+      // Suppression recue : la trace part, et aucune marque ne reste ici.
+      if (mine) {
+        await trackRepository.remove(record.id, { hard: true });
+        counts.purged += 1;
+      } else {
+        counts.ignored += 1;
+      }
+      continue;
+    }
+
+    if (!mine) {
+      winners.push(record);
+      counts.added += 1;
+    } else if (mine.deletedAt) {
+      // Deja supprimee ici : l'autre appareil n'a simplement pas encore ete prevenu.
+      counts.ignored += 1;
+    } else if (String(record.updatedAt || '') > String(mine.updatedAt || '')) {
+      winners.push(record);
+      counts.updated += 1;
+    } else {
+      counts.ignored += 1;
+    }
+  }
+
+  // Marques emises ici : l'autre appareil a-t-il traite la suppression ? Seul
+  // un fichier exporte APRES elle peut le prouver, par l'absence de la trace.
+  if (exportedAt) {
+    for (const mine of local.values()) {
+      if (!mine.deletedAt || remote.has(mine.id)) continue;
+      if (String(exportedAt) > String(mine.deletedAt)) {
+        await trackRepository.remove(mine.id, { hard: true });
+        counts.purged += 1;
+      }
+    }
+  }
+
+  // Meme precaution que mergeCollection : `saveMany` preserve `updatedAt`.
+  if (winners.length) await trackRepository.saveMany(winners);
+  return counts;
+}
 
 /**
  * Une collection. Le fichier ne peut qu'ajouter ou remplacer, jamais supprimer
