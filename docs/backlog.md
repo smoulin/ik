@@ -160,3 +160,12 @@ Agilmea, et `aapt2 dump badging` liste bien les densités attendues.
 Corriger une faute de frappe après avoir choisi une suggestion fait donc
 retomber le calcul sur un géocodage du texte entier, moins précis que le point
 retenu. Sans effet tant qu'on sélectionne dans la liste sans y revenir.
+
+## Aller-retour : 23,3 ou 23,4 km selon le chemin suivi
+
+Pour un aller de 11,65 km, « Calculer » avec la case cochée donne 23,3 km
+(`distanceService` double la distance exacte puis arrondit), alors que cocher
+la case après un calcul donne 23,4 km (`tripView` double la distance aller déjà
+arrondie à 11,7). Écart d'un dixième, mais sur un montant déclaré : à arbitrer
+par l'utilisateur avant correction. Constaté le 16/09/2026, antérieur à la
+v0.13.0.

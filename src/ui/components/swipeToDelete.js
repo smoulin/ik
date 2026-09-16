@@ -67,7 +67,13 @@ export function attachSwipeToDelete(card, { onDelete }) {
       }
       if (Math.abs(dx) < DECIDE_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return;
       mode = 'swipe';
-      card.setPointerCapture?.(event.pointerId);
+      // La capture garde le geste meme si le doigt sort de la carte. Son
+      // absence ne doit pas empecher le balayage.
+      try {
+        card.setPointerCapture?.(event.pointerId);
+      } catch {
+        /* pointeur deja relache : sans importance */
+      }
       if (openRow && openRow !== api) openRow.close();
     }
 
@@ -93,12 +99,17 @@ export function attachSwipeToDelete(card, { onDelete }) {
   card.addEventListener(
     'click',
     (event) => {
-      if (dragged || offset > 0) {
-        event.stopPropagation();
-        event.preventDefault();
+      if (!dragged && offset === 0) return;
+      event.stopPropagation();
+      event.preventDefault();
+      // Le click qui conclut le geste est simplement avale : refermer ici
+      // annulerait le balayage aussitot fini. Seul un appui ulterieur, sur
+      // une carte restee ouverte, la referme.
+      if (dragged) {
         dragged = false;
-        if (offset > 0 && !event.target.closest('.swipe-trash')) close();
+        return;
       }
+      close();
     },
     true,
   );
