@@ -431,6 +431,42 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     }
   }
 
+  function refreshPersonalRoutes() {
+    const container = byId('personalRoutesList');
+    container.replaceChildren();
+
+    if (!store.state.personalRoutes.length) {
+      container.append(el('p', { class: 'hint', text: 'Aucun trajet personnel.' }));
+      return;
+    }
+
+    for (const route of store.state.personalRoutes) {
+      container.append(
+        el('div', { class: 'settings-item' }, [
+          el('div', { class: 'settings-item-main' }, [
+            el('strong', { text: `${spotName(route.a)} ↔ ${spotName(route.b)}` }),
+          ]),
+          el('div', { class: 'item-actions' }, [
+            el('button', {
+              class: 'danger',
+              text: 'Suppr.',
+              dataset: { action: 'delete-route', id: route.id },
+            }),
+          ]),
+        ]),
+      );
+    }
+  }
+
+  /** Un lieu sans nom connu se designe par ses coordonnees, faute de mieux. */
+  function spotName(spot) {
+    if (spot?.label) return spot.label;
+    if (Number.isFinite(spot?.latitude)) {
+      return `${spot.latitude.toFixed(4)}, ${spot.longitude.toFixed(4)}`;
+    }
+    return 'Lieu inconnu';
+  }
+
   /* ================================================================ */
   /* Sauvegarde / restauration                                         */
   /* ================================================================ */
@@ -577,12 +613,17 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
       favoritePlaces: 'lieu',
       beneficiaries: 'bénéficiaire',
       tracks: 'trajet à valider',
+      personalRoutes: 'trajet personnel',
     };
 
     const parts = Object.entries(counts)
-      .filter(([, c]) => c.added || c.updated)
+      .filter(([, c]) => c.added || c.updated || c.purged)
       .map(([key, c]) => {
-        const detail = [c.added ? `${c.added} ajouté(s)` : null, c.updated ? `${c.updated} mis à jour` : null]
+        const detail = [
+          c.added ? `${c.added} ajouté(s)` : null,
+          c.updated ? `${c.updated} mis à jour` : null,
+          c.purged ? `${c.purged} supprimé(s)` : null,
+        ]
           .filter(Boolean)
           .join(', ');
         return `${noms[key] || key} : ${detail}`;
@@ -648,6 +689,7 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     if (action === 'delete-company') await removeCompany(id);
     if (action === 'delete-vehicle') await removeVehicle(id);
     if (action === 'delete-place') await removePlace(id);
+    if (action === 'delete-route') await removePersonalRoute(id);
   });
 
   async function removeCompany(id) {
@@ -682,6 +724,13 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     onChanged();
   }
 
+  async function removePersonalRoute(id) {
+    const message = 'Supprimer ce trajet personnel ? Les trajets déjà écartés ne reviendront pas.';
+    if (!window.confirm(message)) return;
+    await store.deletePersonalRoute(id);
+    onChanged();
+  }
+
   function setStatus(node, message, kind = '') {
     node.textContent = message;
     node.className = `status ${kind}`;
@@ -696,6 +745,7 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
     refreshCompanies();
     refreshVehicles();
     refreshPlaces();
+    refreshPersonalRoutes();
     refreshAbout();
   }
 

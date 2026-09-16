@@ -1,5 +1,5 @@
 /**
- * Montee de version du schema IndexedDB, de 1 vers 2.
+ * Montee de version du schema IndexedDB : de 1 vers 2, puis de 2 vers 3.
  *
  * C'est le risque le plus concret de cette version : la base installee sur le
  * telephone est en version 1 et contient de vraies donnees. L'ajout du magasin
@@ -13,6 +13,7 @@ import {
   companyRepository,
   tripRepository,
   trackRepository,
+  personalRouteRepository,
 } from '../../src/data/repositories/index.js';
 
 /** Recree exactement le schema de la version 1, avec quelques donnees. */
@@ -111,19 +112,102 @@ describe('migration du schéma 1 vers 2', () => {
     expect(await trackRepository.list()).toHaveLength(1);
   });
 
-  it('porte bien la version 2 après ouverture', async () => {
+  it('porte la version courante après ouverture, en passant par les étapes', async () => {
     await createLegacyDatabaseV1();
     await companyRepository.list();
 
     const db = await openDb();
-    expect(db.version).toBe(2);
+    expect(db.version).toBe(3);
     expect([...db.objectStoreNames]).toContain(STORES.TRACKS);
+    expect([...db.objectStoreNames]).toContain(STORES.PERSONAL_ROUTES);
   });
 
-  it('crée directement une base en version 2 sur une installation neuve', async () => {
+  it('crée directement une base en version courante sur une installation neuve', async () => {
     const db = await openDb();
-    expect(db.version).toBe(2);
+    expect(db.version).toBe(3);
     expect([...db.objectStoreNames]).toContain(STORES.TRACKS);
     expect([...db.objectStoreNames]).toContain(STORES.TRIPS);
+    expect([...db.objectStoreNames]).toContain(STORES.PERSONAL_ROUTES);
+  });
+});
+
+/** Base telle que la v0.12.0 la laisse : version 2, avec des traces. */
+function createDatabaseV2() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 2);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      for (const name of [
+        STORES.COMPANIES,
+        STORES.VEHICLES,
+        STORES.TRIPS,
+        STORES.FAVORITE_PLACES,
+        STORES.BENEFICIARIES,
+      ]) {
+        db.createObjectStore(name, { keyPath: 'id' });
+      }
+      db.createObjectStore(STORES.RECENT_ADDRESSES, { keyPath: 'key' });
+      db.createObjectStore(STORES.GEO_CACHE, { keyPath: 'key' });
+      db.createObjectStore(STORES.SETTINGS, { keyPath: 'key' });
+      const tracks = db.createObjectStore(STORES.TRACKS, { keyPath: 'id' });
+      tracks.createIndex('byStartedAt', 'startedAt');
+      tracks.createIndex('byStatus', 'status');
+    };
+
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction([STORES.TRIPS, STORES.TRACKS], 'readwrite');
+      tx.objectStore(STORES.TRIPS).put({
+        id: 'trip_1',
+        date: '2026-09-10',
+        companyId: 'company_a',
+        vehicleId: 'vehicle_1',
+        from: 'A',
+        to: 'B',
+        km: 12.3,
+        createdAt: '2026-09-10T09:00:00.000Z',
+        updatedAt: '2026-09-10T09:00:00.000Z',
+        deletedAt: null,
+      });
+      tx.objectStore(STORES.TRACKS).put({
+        id: 'track_1',
+        source: 'native',
+        startedAt: '2026-09-15T08:00:00.000Z',
+        distanceMeters: 4200,
+        status: 'pending',
+        geometry: [],
+        createdAt: '2026-09-15T08:30:00.000Z',
+        updatedAt: '2026-09-15T08:30:00.000Z',
+        deletedAt: null,
+      });
+      tx.oncomplete = () => {
+        db.close();
+        resetDbConnection();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+    };
+
+    request.onerror = () => reject(request.error);
+  });
+}
+
+describe('migration du schéma 2 vers 3', () => {
+  it('conserve trajets et traces, et ajoute les trajets personnels', async () => {
+    await createDatabaseV2();
+
+    const trips = await tripRepository.list();
+    const tracks = await trackRepository.list();
+
+    expect(trips).toHaveLength(1);
+    expect(trips[0].km).toBeCloseTo(12.3, 6);
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].distanceMeters).toBe(4200);
+    expect(tracks[0].status).toBe('pending');
+    expect(await personalRouteRepository.list()).toEqual([]);
+
+    const db = await openDb();
+    expect(db.version).toBe(3);
   });
 });

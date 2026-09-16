@@ -445,6 +445,12 @@ button.wide + .button-row,
   line-height: 1.45;
 }
 
+/* Precision placee sous un bouton, centree sur lui. */
+.hint.center {
+  text-align: center;
+  margin: 4px 0 0;
+}
+
 .warning {
   border-color: #f59e0b;
   background: #fffbeb;
@@ -853,6 +859,39 @@ td.num {
   margin-bottom: 9px;
   overflow: hidden;
   background: #fff;
+}
+
+/*
+ * Balayage d'une carte « A valider » : la carte glisse vers la droite et
+ * decouvre la poubelle, posee dessous sur le fond rouge.
+ */
+.swipe-row {
+  position: relative;
+  margin-bottom: 9px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--danger);
+}
+
+.swipe-row > .trip-card {
+  position: relative;
+  margin-bottom: 0;
+  touch-action: pan-y;
+  will-change: transform;
+}
+
+.swipe-trash {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 76px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
 }
 
 .trip-summary {

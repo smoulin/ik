@@ -154,9 +154,192 @@ sync` ne régénère pas les icônes, il faut écrire dans `res/` puis reconstru
 **Validation** : l'icône du lanceur sur le téléphone montre le monogramme
 Agilmea, et `aapt2 dump badging` liste bien les densités attendues.
 
-## Les coordonnées d'une suggestion sont perdues dès qu'on retouche le champ
+---
 
-`tripView.js` remet `fromCoords` / `toCoords` à `null` sur chaque `input`.
-Corriger une faute de frappe après avoir choisi une suggestion fait donc
-retomber le calcul sur un géocodage du texte entier, moins précis que le point
-retenu. Sans effet tant qu'on sélectionne dans la liste sans y revenir.
+### [ ] 2026-09-09 — Les coordonnées d'une suggestion sont perdues dès qu'on retouche le champ
+
+**Source** : revue de la v0.12.0 (recherche des commerces par leur nom)
+**Tags** : `ux`, `bug-minor`
+**Effort estimé** : S
+
+**Problème** : après avoir choisi une suggestion dans la liste, la moindre
+retouche du texte du champ (corriger une faute, ajouter un étage) efface les
+coordonnées de la suggestion. Le calcul de distance géocode alors le texte
+entier, moins précisément que le point choisi — et le nom d'un commerce en tête
+du libellé peut dérouter le géocodeur.
+
+**Localisation** : `src/ui/views/tripView.js`, gestionnaires `onInput` des deux
+`attachAddressAutocomplete` (départ et arrivée), qui remettent
+`fromCoords` / `toCoords` à `null`.
+
+**Pourquoi c'est gênant** : une distance moins juste, sans que rien ne le signale.
+
+**Pourquoi pas maintenant** : hors du périmètre demandé ; sans effet tant qu'on
+sélectionne dans la liste sans revenir sur le texte.
+
+**Comment corriger** : ne perdre les coordonnées que si le texte s'éloigne
+réellement du libellé choisi (par exemple, mémoriser le libellé sélectionné et
+comparer `normalizeText` avant/après). Écueil : effacer entièrement le champ
+doit toujours effacer les coordonnées.
+
+**Validation** : choisir « Bricomarché », ajouter un espace en fin de champ,
+calculer : la distance est identique à celle obtenue sans retouche.
+
+---
+
+### [ ] 2026-09-16 — Aller-retour : 23,3 ou 23,4 km selon le chemin suivi
+
+**Source** : recette R11/R12 de la v0.13.0
+**Tags** : `bug-minor`
+**Effort estimé** : XS
+
+**Problème** : pour un aller de 11,65 km, « Calculer » avec la case cochée donne
+23,3 km, alors que cocher la case après un calcul donne 23,4 km. Le premier
+chemin double la distance exacte puis arrondit ; le second double la distance
+aller déjà arrondie à 11,7. Le défaut est antérieur à la v0.13.0.
+
+**Localisation** : `src/services/geo/distanceService.js` (`km` arrondi après
+doublement) ; `src/ui/views/tripView.js` (gestionnaire `change` de
+`fields.roundTrip` et `calculateDistance`, qui doublent `result.oneWayKm`
+arrondi).
+
+**Pourquoi c'est gênant** : un écart d'un dixième de kilomètre sur un montant
+déclaré, et deux valeurs différentes pour le même trajet selon l'ordre des gestes.
+
+**Pourquoi pas maintenant** : touche au calcul d'un montant ; la règle du projet
+impose de soumettre ce choix à l'utilisateur avant implémentation.
+
+**Comment corriger** : choisir une règle unique avec l'utilisateur — le plus
+lisible est « aller-retour = 2 × aller affiché » (23,4) — et l'appliquer dans
+`distanceService` comme dans `tripView`. Écueil : les trajets déjà enregistrés
+gardent leur valeur ; ne pas les recalculer.
+
+**Validation** : pour un même trajet, les deux chemins donnent la même valeur,
+égale à deux fois la distance aller affichée.
+
+---
+
+### [ ] 2026-09-16 — Réimporter un GPX déjà supprimé le fait revenir
+
+**Source** : revue de la v0.13.0 (marques de suppression vides)
+**Tags** : `bug-minor`
+**Effort estimé** : S
+
+**Problème** : une trace supprimée n'est plus qu'une marque sans date de début
+ni distance. Or la détection de doublon compare justement ces deux valeurs, et
+seulement sur les traces non supprimées. Importer à la main un fichier GPX dont
+la trace avait été supprimée la fait donc réapparaître. Avant la v0.13.0, la
+trace « ignorée » gardait ses valeurs et servait de témoin.
+
+**Localisation** : `src/services/tracks/trackImportService.js`, fonction
+`isDuplicate` ; règle de vidage dans `src/domain/models.js`, `createTrack`.
+
+**Pourquoi c'est gênant** : un trajet supprimé revient si l'on réimporte le
+même fichier, et il faut le supprimer une seconde fois.
+
+**Pourquoi pas maintenant** : impact faible — les sessions enregistrées par
+l'application Android sont effacées du téléphone dès leur import, seul l'import
+manuel d'un fichier est concerné — et le témoin exigerait de conserver une
+donnée que l'utilisateur a demandé d'effacer.
+
+**Comment corriger** : conserver dans la marque une empreinte non réversible de
+la session (hachage de `startedAt` + distance arrondie), et la comparer dans
+`isDuplicate` en lisant aussi les supprimées. Écueil : l'empreinte ne doit
+permettre de retrouver ni l'heure ni le lieu ; la purge de la marque après
+fusion la fait disparaître, ce qui est acceptable.
+
+**Validation** : importer un GPX, le supprimer, le réimporter : aucune carte
+n'apparaît, et la marque en base ne contient ni heure ni lieu lisibles.
+
+---
+
+### [ ] 2026-09-16 — « Valider » écrit la trace depuis sa copie en mémoire
+
+**Source** : revue de la v0.13.0, en corrigeant le retour des trajets supprimés
+**Tags** : `bug-minor`
+**Effort estimé** : XS
+
+**Problème** : `convert` enregistre `{ ...track, status: 'converted' }` à partir
+de la trace gardée en mémoire par l'écran. Si cette trace a été supprimée entre
+l'affichage et l'appui (par une fusion ou un autre onglet), l'écriture la fait
+revenir avec ses lieux, sous le statut « convertie ». Le même défaut a été
+corrigé pour le nommage des adresses (`writeEndpoints`), pas pour la validation.
+
+**Localisation** : `src/ui/views/homeView.js`, fonction `convert`.
+
+**Pourquoi c'est gênant** : des données effacées réapparaissent en base, même
+si la trace ne s'affiche plus.
+
+**Pourquoi pas maintenant** : scénario très improbable — il faut une
+suppression concurrente pendant que la carte est ouverte.
+
+**Comment corriger** : remplacer l'écriture par `store.markTrackConverted(track.id)`,
+qui relit déjà la base, en le complétant pour ignorer une trace supprimée.
+
+**Validation** : test unitaire : supprimer la trace, appeler la conversion avec
+la copie périmée, constater que la marque reste vide.
+
+---
+
+### [ ] 2026-09-16 — Écran « À valider » : comportements sans test automatisé
+
+**Source** : revue de la v0.13.0
+**Tags** : `dx`
+**Effort estimé** : M
+
+**Problème** : le balayage (`swipeToDelete.js`), l'écartement des trajets
+personnels dans `refresh()`, le vidage des anciennes traces ignorées et le
+calcul lancé par la case aller-retour n'ont été vérifiés qu'en recette
+navigateur (R1 à R18), pas par des tests rejoués à chaque modification.
+
+**Localisation** : `src/ui/components/swipeToDelete.js` ;
+`src/ui/views/homeView.js` (`refresh`, `emptyOldIgnoredTracks`, `markPersonal`) ;
+`src/ui/views/tripView.js` (gestionnaire `change` de `fields.roundTrip`).
+
+**Pourquoi c'est gênant** : une régression sur le geste ou sur l'écartement
+automatique passerait inaperçue jusqu'à l'usage — et l'écartement efface des
+données sans retour.
+
+**Pourquoi pas maintenant** : le projet n'a pas encore de tests d'interface ;
+les poser est un chantier en soi.
+
+**Comment corriger** : extraire le filtrage de `refresh()` dans une fonction de
+service testable avec fake-indexeddb ; tester `attachSwipeToDelete` avec
+jsdom/happy-dom en simulant des `PointerEvent`. Écueil : jsdom ne gère pas
+`setPointerCapture` (déjà protégé par `try`).
+
+**Validation** : `npm test` couvre au moins R1 à R6 et R11 à R14 sans navigateur.
+
+---
+
+### [ ] 2026-09-16 — Détails mineurs de l'écran « À valider » et des Réglages
+
+**Source** : revue de la v0.13.0
+**Tags** : `ux`
+**Effort estimé** : S
+
+**Problème** : trois points sans conséquence sur les données.
+1. `markPersonal` n'intercepte pas une erreur d'écriture : aucun message si
+   IndexedDB refuse l'enregistrement.
+2. La poubelle d'une carte fermée reste atteignable par un lecteur d'écran
+   (elle sort seulement de l'ordre de tabulation).
+3. Le résumé d'une sauvegarde à importer compte comme « trajets à valider »
+   les marques vides et les traces déjà validées.
+
+**Localisation** : 1. `src/ui/views/homeView.js`, `markPersonal` ;
+2. `src/ui/components/swipeToDelete.js`, `setOffset` ;
+3. `src/ui/views/settingsView.js`, affichage de `inspectBackup(...).counts.tracks`.
+
+**Pourquoi c'est gênant** : 1. un échec silencieux ; 2. une action destructive
+annoncée alors qu'elle n'est pas visible ; 3. un compte trompeur avant import.
+
+**Pourquoi pas maintenant** : cosmétique ou très improbable, découvert en revue
+juste avant livraison.
+
+**Comment corriger** : 1. `try/catch` avec `setStatus(..., 'bad')` ;
+2. `aria-hidden="true"` sur la poubelle tant que la carte est fermée ;
+3. dans `inspectBackup`, compter à part les traces `pending` non supprimées.
+
+**Validation** : 1. écriture forcée en échec → message rouge ; 2. arbre
+d'accessibilité sans bouton « Supprimer ce trajet » carte fermée ; 3. un
+fichier avec 1 trace en attente et 2 marques annonce « 1 trajet à valider ».

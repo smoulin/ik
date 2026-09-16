@@ -348,6 +348,34 @@ export function createFavoritePlace(input = {}) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Trajet personnel                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Deux lieux entre lesquels un trajet n'est jamais professionnel. La regle de
+ * correspondance vit dans domain/tracks/personalRoutes.js ; ce modele ne fait
+ * que normaliser ce qui est stocke.
+ */
+export function createPersonalRoute(input = {}) {
+  return withMeta(
+    {
+      a: routeSpot(input.a),
+      b: routeSpot(input.b),
+    },
+    input,
+    'route',
+  );
+}
+
+function routeSpot(spot) {
+  return {
+    latitude: num(spot?.latitude),
+    longitude: num(spot?.longitude),
+    label: str(spot?.label),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Trace GPS                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -380,6 +408,38 @@ export const TRACK_LABEL_SOURCES = ['favorite', 'address', 'none'];
  * @property {string|null} tripId   trajet cree a partir de cette trace
  */
 export function createTrack(input = {}) {
+  /*
+   * Trace supprimee : il n'en reste qu'une marque. Ni trace, ni lieux, ni
+   * horaires — rien qui dise ou l'on etait. Les metadonnees suffisent a
+   * propager la suppression a l'autre appareil lors d'une fusion ; sans elles,
+   * la fusion prendrait la trace de l'autre appareil pour une nouvelle et la
+   * ferait revenir. La marque elle-meme disparait une fois l'autre appareil
+   * prevenu (cf. mergeTracks dans backupService).
+   *
+   * Les traces ignorees avant cette regle, qui gardaient lieux et adresses,
+   * sont videes de la meme facon des qu'elles sont reecrites.
+   */
+  if (input.deletedAt || input.status === 'ignored') {
+    return withMeta(
+      {
+        source: '',
+        fileName: '',
+        startedAt: '',
+        endedAt: '',
+        distanceMeters: 0,
+        rawDistanceMeters: 0,
+        quality: null,
+        start: null,
+        end: null,
+        geometry: [],
+        status: 'ignored',
+        tripId: null,
+      },
+      { ...input, deletedAt: input.deletedAt || nowIso() },
+      'track',
+    );
+  }
+
   const status = TRACK_STATUSES.includes(input.status) ? input.status : 'pending';
   const geometry = Array.isArray(input.geometry) ? input.geometry : [];
 

@@ -26,6 +26,7 @@ import {
   favoritePlaceRepository,
   beneficiaryRepository,
   trackRepository,
+  personalRouteRepository,
   settingsRepository,
 } from '../../src/data/repositories/index.js';
 import { buildReport } from '../../src/domain/reporting/reportModel.js';
@@ -181,8 +182,12 @@ describe('sauvegarde des trajets a valider', () => {
     await trackRepository.clear();
     await restoreBackup(backup);
 
-    const statuts = (await trackRepository.list()).map((t) => t.status).sort();
-    expect(statuts).toEqual(['converted', 'ignored']);
+    const toutes = await trackRepository.list({ includeDeleted: true });
+    expect(toutes.map((t) => t.status).sort()).toEqual(['converted', 'ignored']);
+    // Une trace ignoree n'est plus qu'une marque : restauree comme telle.
+    const ignoree = toutes.find((t) => t.status === 'ignored');
+    expect(ignoree.deletedAt).toBeTruthy();
+    expect(ignoree.start).toBeNull();
   });
 
   /*
@@ -430,6 +435,178 @@ describe('fusion de sauvegardes', () => {
 
     expect(counts.tracks.added).toBe(1);
     expect(await trackRepository.list()).toHaveLength(1);
+  });
+});
+
+/*
+ * Marques de suppression des traces : elles existent pour prevenir l'autre
+ * appareil, et disparaissent des qu'il l'est.
+ */
+describe('marques de suppression des traces', () => {
+  const trace = (overrides = {}) => ({
+    source: 'native',
+    startedAt: '2026-09-15T08:00:00.000Z',
+    endedAt: '2026-09-15T08:20:00.000Z',
+    distanceMeters: 5000,
+    start: { latitude: 45.1, longitude: 5.1, label: 'Maison' },
+    end: { latitude: 45.11, longitude: 5.1, label: 'Salle de sport' },
+    status: 'pending',
+    ...overrides,
+  });
+
+  const fichier = (exportedAt, tracks) => ({
+    format: 'agilmea-ik-backup',
+    schemaVersion: 2,
+    exportedAt,
+    tracks,
+  });
+
+  // R19
+  it('retire la trace sur l’appareil qui recoit la suppression, sans garder de marque', async () => {
+    const vivante = await trackRepository.save(trace());
+    const fichierDeB = await buildBackup({ appVersion: 'test' });
+
+    await trackRepository.save({ ...vivante, deletedAt: '2026-09-16T10:00:00.000Z' });
+    const fichierDeA = await buildBackup({ appVersion: 'test' });
+
+    await resetDatabase();
+    await mergeBackup(fichierDeB);
+    expect(await trackRepository.list()).toHaveLength(1);
+
+    const counts = await mergeBackup(fichierDeA);
+
+    expect(counts.tracks.purged).toBe(1);
+    expect(await trackRepository.list({ includeDeleted: true })).toHaveLength(0);
+  });
+
+  it('n’installe aucune marque sur un appareil qui n’a jamais connu la trace', async () => {
+    const vivante = await trackRepository.save(trace());
+    await trackRepository.save({ ...vivante, deletedAt: '2026-09-16T10:00:00.000Z' });
+    const fichierDeA = await buildBackup({ appVersion: 'test' });
+
+    await resetDatabase();
+    await mergeBackup(fichierDeA);
+
+    expect(await trackRepository.list({ includeDeleted: true })).toHaveLength(0);
+  });
+
+  // R20
+  it('efface la marque d’origine quand l’autre appareil prouve l’avoir traitee', async () => {
+    const vivante = await trackRepository.save(trace());
+    await trackRepository.save({ ...vivante, deletedAt: '2026-09-16T10:00:00.000Z' });
+
+    const counts = await mergeBackup(fichier('2026-09-16T12:00:00.000Z', []));
+
+    expect(counts.tracks.purged).toBe(1);
+    expect(await trackRepository.list({ includeDeleted: true })).toHaveLength(0);
+  });
+
+  // R21
+  it('garde la marque tant que l’autre appareil n’a rien prouve', async () => {
+    const vivante = await trackRepository.save(trace());
+    await trackRepository.save({ ...vivante, deletedAt: '2026-09-16T10:00:00.000Z' });
+
+    // Fichier anterieur a la suppression : il ne prouve rien.
+    await mergeBackup(fichier('2026-09-16T09:00:00.000Z', []));
+    expect(await trackRepository.list({ includeDeleted: true })).toHaveLength(1);
+
+    // Fichier posterieur ou la trace est encore vivante : l'autre cote n'est pas prevenu.
+    await mergeBackup(
+      fichier('2026-09-16T12:00:00.000Z', [{ ...vivante, updatedAt: '2026-09-16T09:30:00.000Z' }]),
+    );
+    const toutes = await trackRepository.list({ includeDeleted: true });
+    expect(toutes).toHaveLength(1);
+    expect(toutes[0].deletedAt).toBeTruthy();
+    expect(toutes[0].start).toBeNull();
+
+    // Un fichier sans date d'export ne prouve rien non plus.
+    await mergeBackup({ format: 'agilmea-ik-backup', schemaVersion: 2, tracks: [] });
+    expect(await trackRepository.list({ includeDeleted: true })).toHaveLength(1);
+  });
+
+  it('traite une trace ignoree par une ancienne version comme une suppression', async () => {
+    const vivante = await trackRepository.save(trace());
+    // Renommee ici apres l'export de l'autre appareil : updatedAt plus recent.
+    await trackRepository.save({ ...vivante, updatedAt: '2099-01-01T00:00:00.000Z' });
+
+    const ancienFormat = { ...vivante, status: 'ignored', deletedAt: null, updatedAt: '2026-09-16T09:00:00.000Z' };
+    await mergeBackup(fichier('2026-09-16T10:00:00.000Z', [ancienFormat]));
+
+    expect(await trackRepository.list()).toHaveLength(0);
+  });
+
+  it('ne purge rien avec un fichier qui ne transporte pas les traces', async () => {
+    const vivante = await trackRepository.save(trace());
+    await trackRepository.save({ ...vivante, deletedAt: '2026-09-16T10:00:00.000Z' });
+
+    await mergeBackup({ format: 'agilmea-ik-backup', schemaVersion: 2, exportedAt: '2026-09-16T12:00:00.000Z' });
+
+    expect(await trackRepository.list({ includeDeleted: true })).toHaveLength(1);
+  });
+
+  // R22
+  it('ne ressuscite pas une trace supprimee meme si l’autre version est plus recente', async () => {
+    const vivante = await trackRepository.save(trace());
+    await trackRepository.save({ ...vivante, deletedAt: '2026-09-16T10:00:00.000Z' });
+
+    await mergeBackup(
+      fichier('2026-09-16T08:00:00.000Z', [{ ...vivante, updatedAt: '2099-01-01T00:00:00.000Z' }]),
+    );
+
+    expect(await trackRepository.list()).toHaveLength(0);
+  });
+});
+
+/*
+ * Trajets personnels : une regle creee sur le telephone doit exister aussi dans
+ * le navigateur, et sa suppression s'y propager.
+ */
+describe('trajets personnels dans la sauvegarde', () => {
+  const regle = (overrides = {}) => ({
+    a: { latitude: 45.1, longitude: 5.1, label: 'Maison' },
+    b: { latitude: 45.11, longitude: 5.1, label: 'Salle de sport' },
+    ...overrides,
+  });
+
+  it('les emporte et les restaure', async () => {
+    const origine = await personalRouteRepository.save(regle());
+    const backup = await buildBackup({ appVersion: 'test' });
+    expect(backup.personalRoutes).toHaveLength(1);
+    expect(inspectBackup(backup).counts.personalRoutes).toBe(1);
+
+    await personalRouteRepository.clear();
+    await restoreBackup(backup);
+
+    const [restauree] = await personalRouteRepository.list();
+    expect(restauree.id).toBe(origine.id);
+    expect(restauree.b.label).toBe('Salle de sport');
+  });
+
+  it('ne les efface pas quand le fichier n’en parle pas', async () => {
+    await personalRouteRepository.save(regle());
+    const backup = await buildBackup({ appVersion: 'test' });
+    delete backup.personalRoutes;
+
+    await restoreBackup(backup);
+
+    expect(await personalRouteRepository.list()).toHaveLength(1);
+    expect(inspectBackup(backup).counts.personalRoutes).toBeNull();
+  });
+
+  it('propage par fusion une regle creee et une regle supprimee ailleurs', async () => {
+    const gardee = await personalRouteRepository.save(regle());
+    const supprimee = await personalRouteRepository.save(
+      regle({ a: { latitude: 45.3, longitude: 5.3, label: 'Ecole' } }),
+    );
+    await personalRouteRepository.remove(supprimee.id);
+    const backup = await buildBackup({ appVersion: 'test' });
+
+    await resetDatabase();
+    const counts = await mergeBackup(backup);
+
+    expect(counts.personalRoutes.added).toBe(2);
+    const actives = await personalRouteRepository.list();
+    expect(actives.map((r) => r.id)).toEqual([gardee.id]);
   });
 });
 
