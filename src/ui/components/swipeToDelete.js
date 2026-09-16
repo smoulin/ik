@@ -30,6 +30,9 @@ export function attachSwipeToDelete(card, { onDelete }) {
   let offset = 0;
   let base = 0;
   let mode = null; // null | 'swipe' | 'scroll'
+  // Pointeur en cours d'appui. A la souris, les deplacements arrivent aussi en
+  // simple survol : sans ce suivi, passer sur une carte pouvait l'ouvrir.
+  let activePointer = null;
   let dragged = false;
 
   function setOffset(px, animate) {
@@ -48,6 +51,7 @@ export function attachSwipeToDelete(card, { onDelete }) {
 
   card.addEventListener('pointerdown', (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+    activePointer = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;
     base = offset;
@@ -56,7 +60,7 @@ export function attachSwipeToDelete(card, { onDelete }) {
   });
 
   card.addEventListener('pointermove', (event) => {
-    if (mode === 'scroll') return;
+    if (event.pointerId !== activePointer || mode === 'scroll') return;
     const dx = event.clientX - startX;
     const dy = event.clientY - startY;
 
@@ -81,7 +85,9 @@ export function attachSwipeToDelete(card, { onDelete }) {
     setOffset(base + dx, false);
   });
 
-  const finish = () => {
+  const finish = (event) => {
+    if (event.pointerId !== activePointer) return;
+    activePointer = null;
     if (mode !== 'swipe') return;
     mode = null;
     if (offset > REVEAL_PX / 2) {

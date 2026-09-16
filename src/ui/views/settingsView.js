@@ -613,12 +613,17 @@ export function createSettingsView({ store, geo, appVersion, onChanged = () => {
       favoritePlaces: 'lieu',
       beneficiaries: 'bénéficiaire',
       tracks: 'trajet à valider',
+      personalRoutes: 'trajet personnel',
     };
 
     const parts = Object.entries(counts)
-      .filter(([, c]) => c.added || c.updated)
+      .filter(([, c]) => c.added || c.updated || c.purged)
       .map(([key, c]) => {
-        const detail = [c.added ? `${c.added} ajouté(s)` : null, c.updated ? `${c.updated} mis à jour` : null]
+        const detail = [
+          c.added ? `${c.added} ajouté(s)` : null,
+          c.updated ? `${c.updated} mis à jour` : null,
+          c.purged ? `${c.purged} supprimé(s)` : null,
+        ]
           .filter(Boolean)
           .join(', ');
         return `${noms[key] || key} : ${detail}`;

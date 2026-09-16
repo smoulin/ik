@@ -60,21 +60,29 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
 
   const fromAutocomplete = attachAddressAutocomplete(fields.from, {
     service: geo.addressSearchService,
+    // Changer une extremite rend perimee la distance aller deja calculee : la
+    // case « Aller-retour » la doublerait.
     onSelect: (suggestion) => {
       fromCoords = coordsOf(suggestion);
+      lastOneWayKm = null;
     },
     onInput: () => {
       fromCoords = null;
+      lastOneWayKm = null;
     },
   });
 
   const toAutocomplete = attachAddressAutocomplete(fields.to, {
     service: geo.addressSearchService,
+    // Changer une extremite rend perimee la distance aller deja calculee : la
+    // case « Aller-retour » la doublerait.
     onSelect: (suggestion) => {
       toCoords = coordsOf(suggestion);
+      lastOneWayKm = null;
     },
     onInput: () => {
       toCoords = null;
+      lastOneWayKm = null;
     },
   });
 
@@ -147,19 +155,30 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
     calcBtn.textContent = 'Calcul en cours…';
     showStatus('Recherche de l’itinéraire…');
 
+    const requestedRoundTrip = fields.roundTrip.checked;
+
     try {
       const result = await geo.distanceService.computeTripDistance({
         from,
         to,
         fromCoords,
         toCoords,
-        roundTrip: fields.roundTrip.checked,
+        roundTrip: requestedRoundTrip,
         preference: fields.routePreference.value,
       });
 
       fromCoords = result.fromCoords;
       toCoords = result.toCoords;
-      fields.km.value = formatDecimalInput(result.km, 1);
+      // La case a pu changer pendant la requete — cocher lance le calcul, un
+      // second appui arrive vite. C'est son etat au retour qui compte : sinon
+      // un aller simple s'enregistrait avec la distance doublee.
+      const km =
+        fields.roundTrip.checked === requestedRoundTrip
+          ? result.km
+          : fields.roundTrip.checked
+            ? result.oneWayKm * 2
+            : result.oneWayKm;
+      fields.km.value = formatDecimalInput(Math.round(km * 10) / 10, 1);
 
       lastOneWayKm = result.oneWayKm;
       lastGeometry = result.geometry;
@@ -170,7 +189,7 @@ export function createTripView({ store, geo, onSaved = () => {}, switchTab }) {
       const itineraire = itineraryLabel(fields.routePreference.value);
       // La duree renvoyee par Valhalla est peu fiable hors autoroute : on ne
       // l'affiche pas, seule la distance est exploitable.
-      showStatus(`${sens} · ${itineraire} : ${formatKm(result.km)}`, 'good');
+      showStatus(`${sens} · ${itineraire} : ${formatKm(Math.round(km * 10) / 10)}`, 'good');
     } catch (error) {
       lastGeometry = null;
       // La distance aller n'est plus fiable : on ne doit plus proposer de
