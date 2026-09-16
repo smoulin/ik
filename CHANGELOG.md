@@ -8,6 +8,8 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+## [0.13.0] — 2026-09-16
+
 ### Ajouté
 - **Balayer un trajet à valider vers la droite** découvre une poubelle ; un
   appui le supprime, sans confirmation — les deux gestes en tiennent lieu.
@@ -26,8 +28,11 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
   Les trajets ignorés par les versions précédentes sont vidés de même.
 
 ### Corrigé
-- Ouvrir un trajet pour le modifier, puis cocher « Aller-retour », doublait la
-  distance du trajet calculé juste avant.
+- Ouvrir un trajet pour le modifier, ou changer son départ ou son arrivée, puis
+  cocher « Aller-retour », doublait la distance calculée juste avant.
+- Décocher « Aller-retour » pendant le calcul laissait la distance doublée.
+- Un trajet ignoré pendant que l'application cherchait encore son adresse
+  pouvait revenir dans la liste.
 
 ## [0.12.0] — 2026-09-09
 
