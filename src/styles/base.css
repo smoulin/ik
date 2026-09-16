@@ -445,6 +445,12 @@ button.wide + .button-row,
   line-height: 1.45;
 }
 
+/* Precision placee sous un bouton, centree sur lui. */
+.hint.center {
+  text-align: center;
+  margin: 4px 0 0;
+}
+
 .warning {
   border-color: #f59e0b;
   background: #fffbeb;

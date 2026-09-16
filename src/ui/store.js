@@ -14,6 +14,7 @@ import {
   beneficiaryRepository,
   settingsRepository,
   trackRepository,
+  personalRouteRepository,
 } from '../data/repositories/index.js';
 import { SETTING_KEYS } from '../data/repositories/settingsRepository.js';
 import { recentAddressRepository } from '../data/repositories/recentAddressRepository.js';
@@ -25,6 +26,7 @@ export function createStore() {
     vehicles: [],
     trips: [],
     favoritePlaces: [],
+    personalRoutes: [],
     beneficiary: null,
     loaded: false,
   };
@@ -41,17 +43,21 @@ export function createStore() {
   }
 
   async function load() {
-    const [companies, vehicles, trips, favoritePlaces] = await Promise.all([
+    const [companies, vehicles, trips, favoritePlaces, personalRoutes] = await Promise.all([
       companyRepository.list(),
       vehicleRepository.list(),
       tripRepository.list(),
       favoritePlaceRepository.list(),
+      personalRouteRepository.list(),
     ]);
 
     state.companies = companies.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
     state.vehicles = vehicles.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
     state.trips = trips;
     state.favoritePlaces = favoritePlaces.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    state.personalRoutes = personalRoutes.sort((a, b) =>
+      String(a.createdAt).localeCompare(String(b.createdAt)),
+    );
     state.beneficiary = await loadPrimaryBeneficiary();
     state.loaded = true;
 
@@ -124,6 +130,12 @@ export function createStore() {
     return saved;
   }
 
+  async function savePersonalRoute(input) {
+    const saved = await personalRouteRepository.save(input);
+    await load();
+    return saved;
+  }
+
   async function saveBeneficiary(input) {
     const saved = await beneficiaryRepository.save({ ...input, id: input.id || state.beneficiary?.id });
     await settingsRepository.set(SETTING_KEYS.PRIMARY_BENEFICIARY_ID, saved.id);
@@ -166,6 +178,11 @@ export function createStore() {
     await load();
   }
 
+  async function deletePersonalRoute(id) {
+    await personalRouteRepository.remove(id);
+    await load();
+  }
+
   /** Marque une trace GPS comme traitee : elle quitte l'ecran d'accueil. */
   async function markTrackConverted(trackId) {
     const track = await trackRepository.get(trackId);
@@ -189,11 +206,13 @@ export function createStore() {
     saveVehicle,
     saveTrip,
     saveFavoritePlace,
+    savePersonalRoute,
     saveBeneficiary,
     deleteCompany,
     deleteVehicle,
     deleteTrip,
     deleteFavoritePlace,
+    deletePersonalRoute,
     markTrackConverted,
     companyUsage,
     vehicleUsage,

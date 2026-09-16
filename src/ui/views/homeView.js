@@ -23,9 +23,11 @@ import {
   readiness,
 } from '../../services/tracks/nativeRecorder.js';
 import { openRecorderSetup } from '../components/recorderSetup.js';
-import { favoritePlaceRepository } from '../../data/repositories/index.js';
+import { favoritePlaceRepository, personalRouteRepository } from '../../data/repositories/index.js';
 import { computeTripAmounts } from '../../domain/mileage/engine.js';
 import { toKilometers } from '../../domain/tracks/trackDistance.js';
+import { routeFromTrack, partitionByPersonalRoutes } from '../../domain/tracks/personalRoutes.js';
+import { nowIso } from '../../domain/ids.js';
 import { formatKm, formatMoney } from '../../shared/format.js';
 
 export function createHomeView({ store, geo = null, onChanged = () => {}, onEditDraft }) {
@@ -185,6 +187,15 @@ export function createHomeView({ store, geo = null, onChanged = () => {}, onEdit
     // doit nommer les trajets d'avant-hier. Comparaison locale, sans réseau.
     await importService.matchFavorites(tracks).catch(() => {});
 
+    // Trajets personnels : ecartes ici, point de passage de toute trace en
+    // attente — enregistrement Android, import GPX ou restauration. Une regle
+    // creee a l'instant retire donc aussi ceux deja dans la liste.
+    const { kept, personal } = partitionByPersonalRoutes(tracks, await personalRouteRepository.list());
+    for (const track of personal) await discard(track);
+    tracks = kept;
+
+    await emptyOldIgnoredTracks();
+
     await refreshRecorderState();
 
     badge.textContent = String(tracks.length);
@@ -216,6 +227,19 @@ export function createHomeView({ store, geo = null, onChanged = () => {}, onEdit
         if (named) render();
       })
       .catch(() => {});
+  }
+
+  /**
+   * Les traces ignorees avant la v0.13.0 gardaient lieux, adresses et horaires.
+   * Les reecrire suffit a les vider : la regle vit dans `createTrack`. Une fois
+   * fait, la passe ne trouve plus rien et ne coute qu'une lecture.
+   */
+  async function emptyOldIgnoredTracks() {
+    const all = await trackRepository.list({ includeDeleted: true });
+    const stale = all.filter(
+      (track) => track.status === 'ignored' && (track.start || track.end || track.startedAt),
+    );
+    for (const track of stale) await trackRepository.save(track);
   }
 
   function needsName(endpoint) {
@@ -396,6 +420,12 @@ export function createHomeView({ store, geo = null, onChanged = () => {}, onEdit
         el('button', { text: 'Compléter', onClick: () => editDraft(track, selectedCompanyId) }),
         el('button', { class: 'danger', text: 'Ignorer', onClick: () => ignore(track) }),
       ]),
+      el('button', {
+        class: 'wide',
+        text: 'Trajet personnel',
+        onClick: () => markPersonal(track),
+      }),
+      el('p', { class: 'hint center', text: 'Ce trajet et son retour ne seront plus proposés.' }),
     ]);
 
     // La carte n'est chargée qu'ici : elle n'existe que pour la trace ouverte.
@@ -485,12 +515,38 @@ export function createHomeView({ store, geo = null, onChanged = () => {}, onEdit
     onEditDraft?.({ ...trackToTripDraft(track), companyId });
   }
 
-  async function ignore(track) {
-    if (!window.confirm('Ignorer ce trajet enregistré ?')) return;
-    await trackRepository.save({ ...track, status: 'ignored' });
+  /**
+   * « Ignorer » depuis le detail demande confirmation ; le balayage, lui, en
+   * tient lieu par ses deux gestes.
+   */
+  async function ignore(track, { confirm = true } = {}) {
+    if (confirm && !window.confirm('Ignorer ce trajet enregistré ?')) return;
+    await discard(track);
     expanded.delete(track.id);
     await refresh();
-    setStatus('Trajet ignoré.', '');
+    setStatus('Trajet supprimé.', '');
+  }
+
+  /**
+   * Il ne reste de la trace qu'une marque vide, le temps de prevenir l'autre
+   * appareil (cf. createTrack).
+   */
+  function discard(track) {
+    return trackRepository.save({ ...track, deletedAt: nowIso() });
+  }
+
+  async function markPersonal(track) {
+    const route = routeFromTrack(track);
+    if (!route) {
+      setStatus('Lieu de départ ou d’arrivée inconnu : ce trajet ne peut pas être mémorisé.', 'bad');
+      return;
+    }
+    await store.savePersonalRoute(route);
+    expanded.delete(track.id);
+    // refresh() ecarte ce trajet ET ceux deja en attente sur le meme parcours.
+    await refresh();
+    onChanged();
+    setStatus('Trajet personnel mémorisé. Tu le retrouves dans Réglages.', 'good');
   }
 
   return { refresh, importSharedFile, collectFromDevice };
