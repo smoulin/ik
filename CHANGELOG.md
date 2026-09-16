@@ -8,6 +8,27 @@ Tant que l'application est en développement initial, la version reste en `0.x.x
 
 ## [Non publié]
 
+### Ajouté
+- **Balayer un trajet à valider vers la droite** découvre une poubelle ; un
+  appui le supprime, sans confirmation — les deux gestes en tiennent lieu.
+- **Trajets personnels.** Le bouton « Trajet personnel », dans le détail d'un
+  trajet à valider, mémorise son départ et son arrivée : ce trajet et son
+  retour ne sont plus jamais proposés, y compris ceux déjà en attente. Les
+  règles se retrouvent et se suppriment dans Réglages → Trajets personnels, et
+  voyagent avec la sauvegarde d'un appareil à l'autre.
+
+### Modifié
+- **Cocher « Aller-retour » lance le calcul** quand la distance n'a pas encore
+  été calculée. Une distance mesurée par le GPS n'est jamais remplacée.
+- **Un trajet supprimé ne laisse plus rien derrière lui** : ni lieux, ni
+  adresses, ni horaires. Seule subsiste une marque vide, le temps de prévenir
+  l'autre appareil lors d'une fusion ; elle disparaît dès qu'il est prévenu.
+  Les trajets ignorés par les versions précédentes sont vidés de même.
+
+### Corrigé
+- Ouvrir un trajet pour le modifier, puis cocher « Aller-retour », doublait la
+  distance du trajet calculé juste avant.
+
 ## [0.12.0] — 2026-09-09
 
 ### Ajouté
